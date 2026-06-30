@@ -6,6 +6,8 @@ packagesDir = ".lake/packages"
 
 [leanOptions]
 autoImplicit = true
+# Enable all mathlib linters: automatically matches what mathlib uses.
+weak.linter.mathlibStandardSet = true
 
 [[require]]
 name = "mathlib"
