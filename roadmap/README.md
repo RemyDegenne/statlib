@@ -11,9 +11,7 @@ What is your goal? Why is it important?
 ## 2. Core Math
 Which theorem (big or small) marks this roadmap as done?
 What informal math (paper or textbook) are you formalizing?
-
-## 3. Scope /Out of scope
-What definitions and results will you formalize?
+What definitions and results will you use to approach the theorem?
 What related topics will you leave out, and why?
 
 ## 4. Design decisions and conventions
