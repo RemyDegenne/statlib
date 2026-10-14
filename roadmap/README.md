@@ -14,7 +14,7 @@ What informal math (paper or textbook) are you formalizing?
 What definitions and results will you use to approach the theorem?
 What related topics will you leave out, and why?
 
-## 4. Design decisions and conventions
+## 3. Design decisions and conventions
 Fix some design choices (select items below that are applicable to your goal):
 - Carrier type: what Lean type represents the object you study (e.g. a plain function, a structure, a measure)?
 - Namespace: which namespace will your definitions and lemmas live in?
@@ -26,9 +26,10 @@ Fix some design choices (select items below that are applicable to your goal):
 
 You might present the code in 
 ```lean
+def example 
 ```
 
-## 5. Proposed file organization and namespace
+## 4. Proposed file organization and namespace
 
 ```text
 Project/Area/Basic.lean
