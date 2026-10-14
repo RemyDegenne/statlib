@@ -8,19 +8,15 @@ large implementation.
 ## 1. Goal
 What is your goal? Why is it important?
 
-## 2. Completion criteria
+## 2. Core Math
 Which theorem (big or small) marks this roadmap as done?
+What informal math (paper or textbook) are you formalizing?
 
-## 3. Scope
+## 3. Scope /Out of scope
 What definitions and results will you formalize?
-
-## 4. Out of scope
 What related topics will you leave out, and why?
 
-## 5. Mathematical model
-What informal math (paper or textbook) are you formalizing, and how does your Lean version differ from it?
-
-## 6. Design decisions and conventions
+## 4. Design decisions and conventions
 Fix some design choices (select items below that are applicable to your goal):
 - Carrier type: what Lean type represents the object you study (e.g. a plain function, a structure, a measure)?
 - Namespace: which namespace will your definitions and lemmas live in?
@@ -30,16 +26,14 @@ Fix some design choices (select items below that are applicable to your goal):
 - Typeclass assumptions: what minimal structure (e.g. `[MeasurableSpace Ω]`, `[Fintype ι]`) does each definition or theorem require?
 - Finite/infinite conventions: do you assume finite or general settings (sums vs. integrals, `ℝ` vs. `ℝ≥0∞`/`EReal`)?
 
+You might present the code in 
+```lean
+```
 
-## 7. Existing Mathlib and Statlib foundations
-Which files or PRs will you build on, and which related ones will you not use?
-
-## 8. Proposed file organization
+## 5. Proposed file organization and namespace
 
 ```text
 Project/Area/Basic.lean
 Project/Area/Operations.lean
 Project/Area/MainTheorem.lean
 ``` 
-The goal is to make important design choices explicit, reduce communication overhead, and leave a
-useful record for contributors who join the project later.
