@@ -324,6 +324,160 @@ lemma Utility.antitone_deriv (U : Utility) : Antitone U.deriv := by
   exact_mod_cast U.antitoneOn_deriv_real (ENNReal.toReal_pos hx0 hx_top)
     (ENNReal.toReal_pos hy0 hy_top) (ENNReal.toReal_mono hy_top hxy)
 
+/-- If the derivative of `U` at `0` is finite, then `U 0` is finite. -/
+lemma Utility.ne_bot_of_deriv_zero_ne_top (U : Utility) (h_deriv : U.deriv 0 ≠ ⊤) :
+    U 0 ≠ ⊥ := by
+  obtain ⟨c, hc⟩ : ∃ c : ℝ, U.deriv 0 = (c : EReal) :=
+    ⟨(U.deriv 0).toReal,
+      (EReal.coe_toReal h_deriv (EReal.ne_bot_of_nonneg (U.deriv_nonneg 0))).symm⟩
+  obtain ⟨r, hr⟩ : ∃ r : ℝ, U 1 = (r : EReal) :=
+    ⟨(U 1).toReal, (EReal.coe_toReal (U.ne_top (by simp)) (U.ne_bot one_ne_zero)).symm⟩
+  suffices h : ((r - c : ℝ) : EReal) ≤ U 0 by
+    intro h0
+    rw [h0, le_bot_iff] at h
+    exact EReal.coe_ne_bot _ h
+  refine ge_of_tendsto
+    ((U.continuous.tendsto 0).mono_left (nhdsWithin_le_nhds (s := Set.Ioi (0 : ℝ≥0∞)))) ?_
+  have h_lt : ∀ᶠ z in 𝓝[>] (0 : ℝ≥0∞), z < 1 :=
+    eventually_nhdsWithin_of_eventually_nhds (eventually_lt_nhds zero_lt_one)
+  filter_upwards [self_mem_nhdsWithin, h_lt] with z hz0 hz1
+  have hz0' : z ≠ 0 := (Set.mem_Ioi.mp hz0).ne'
+  have hz_top : z ≠ ∞ := hz1.ne_top
+  -- the first-order term at the base point `z` is at most `c = U.deriv 0`
+  have h_mul_le : U.deriv z * (((1 : ℝ≥0∞) : EReal) - z) ≤ (c : EReal) := by
+    have hd_le : deriv U.real z.toReal ≤ c := by
+      have h_le := U.deriv_le_deriv_zero z
+      rw [U.deriv_eq_coe hz0' hz_top, hc] at h_le
+      exact_mod_cast h_le
+    have hd_nonneg : 0 ≤ deriv U.real z.toReal :=
+      U.deriv_real_nonneg (ENNReal.toReal_pos hz0' hz_top)
+    have hz_le : z.toReal ≤ 1 := by
+      simpa using ENNReal.toReal_mono (by simp) hz1.le
+    rw [U.deriv_eq_coe hz0' hz_top, EReal.coe_ennreal_one, ← EReal.coe_ennreal_toReal hz_top]
+    norm_cast
+    nlinarith [mul_nonneg (sub_nonneg.2 hd_le) (sub_nonneg.2 hz_le),
+      mul_nonneg (hd_nonneg.trans hd_le) (ENNReal.toReal_nonneg (a := z))]
+  have h1 : U 1 ≤ U z + (c : EReal) :=
+    (U.le_add_deriv_mul (by simp) hz0' hz_top).trans (add_le_add le_rfl h_mul_le)
+  obtain ⟨s, hs⟩ : ∃ s : ℝ, U z = (s : EReal) :=
+    ⟨(U z).toReal, (EReal.coe_toReal (U.ne_top hz_top) (U.ne_bot hz0')).symm⟩
+  rw [hr, hs] at h1
+  rw [hs]
+  have h2 : r ≤ s + c := by exact_mod_cast h1
+  exact_mod_cast sub_le_iff_le_add.mpr h2
+
+/-- If the derivative of `U` at `0` is finite, the first-order Taylor bound of
+`Utility.le_add_deriv_mul` also holds at the base point `0`, for every finite point `y`. -/
+lemma Utility.le_add_deriv_zero_mul (U : Utility) (h_deriv : U.deriv 0 ≠ ⊤) {y : ℝ≥0∞}
+    (hy_top : y ≠ ∞) :
+    U y ≤ U 0 + U.deriv 0 * (y : EReal) := by
+  have hU0_bot : U 0 ≠ ⊥ := U.ne_bot_of_deriv_zero_ne_top h_deriv
+  rcases eq_or_ne y 0 with rfl | hy0
+  · simp
+  have hy_pos : 0 < y.toReal := ENNReal.toReal_pos hy0 hy_top
+  obtain ⟨c, hc⟩ : ∃ c : ℝ, U.deriv 0 = (c : EReal) :=
+    ⟨(U.deriv 0).toReal,
+      (EReal.coe_toReal h_deriv (EReal.ne_bot_of_nonneg (U.deriv_nonneg 0))).symm⟩
+  have hc_nonneg : 0 ≤ c := by exact_mod_cast hc ▸ U.deriv_nonneg 0
+  -- the real-valued inequality, obtained from base points `z ∈ (0, y)` by letting `z → 0`
+  have h_real : U.real y.toReal ≤ U.real 0 + c * y.toReal := by
+    have h_cont : Tendsto U.real (𝓝[>] (0 : ℝ)) (𝓝 (U.real 0)) := by
+      have h_coe : Tendsto (fun z : ℝ ↦ U (ENNReal.ofReal z)) (𝓝 0) (𝓝 (U 0)) := by
+        have h := (U.continuous.tendsto (ENNReal.ofReal 0)).comp
+          (ENNReal.continuous_ofReal.tendsto 0)
+        simpa [Function.comp_def] using h
+      have h_toReal := (EReal.tendsto_toReal (U.ne_top (by simp)) hU0_bot).comp h_coe
+      have h0 : U.real 0 = (U 0).toReal := by simp [Utility.real]
+      rw [h0]
+      exact h_toReal.mono_left nhdsWithin_le_nhds
+    refine ge_of_tendsto (h_cont.add tendsto_const_nhds) ?_
+    have h_lt : ∀ᶠ z in 𝓝[>] (0 : ℝ), z < y.toReal :=
+      eventually_nhdsWithin_of_eventually_nhds (eventually_lt_nhds hy_pos)
+    filter_upwards [self_mem_nhdsWithin, h_lt] with z hz hzy
+    have hz_pos : (0 : ℝ) < z := hz
+    have h_ccv := U.concaveOn_Ioi_real.le_add_deriv_mul (Set.mem_Ioi.mpr hy_pos)
+      (Set.mem_Ioi.mpr hz_pos) (U.differentiableAt_real hz_pos)
+    have hd_le : deriv U.real z ≤ c := by
+      have h_le := U.deriv_le_deriv_zero (ENNReal.ofReal z)
+      rw [U.deriv_eq_coe (by simp [hz_pos]) (by simp), hc,
+        ENNReal.toReal_ofReal hz_pos.le] at h_le
+      exact_mod_cast h_le
+    have hd_nonneg : 0 ≤ deriv U.real z := U.deriv_real_nonneg hz_pos
+    nlinarith [mul_nonneg (sub_nonneg.2 hd_le) (sub_nonneg.2 hzy.le),
+      mul_nonneg hc_nonneg hz_pos.le]
+  calc U y
+  _ = ((U.real y.toReal : ℝ) : EReal) := (U.coe_real_toReal hy0 hy_top).symm
+  _ ≤ ((U.real 0 + c * y.toReal : ℝ) : EReal) := by exact_mod_cast h_real
+  _ = U 0 + U.deriv 0 * (y : EReal) := by
+    rw [EReal.coe_add, EReal.coe_mul, hc]
+    congr 1
+    · simpa using U.coe_real_toReal' hU0_bot (by simp : (0 : ℝ≥0∞) ≠ ∞)
+    · rw [EReal.coe_ennreal_toReal hy_top]
+
+/-- If the derivative of `U` vanishes at a finite nonzero point `x`, then `U` is constant to the
+right of `x`; in particular `U ∞ ≤ U x`. -/
+lemma Utility.apply_top_le_of_deriv_eq_zero (U : Utility) {x : ℝ≥0∞} (hx0 : x ≠ 0)
+    (hx_top : x ≠ ∞) (h_deriv : U.deriv x = 0) :
+    U ∞ ≤ U x := by
+  have h_tendsto : Tendsto (fun n : ℕ ↦ U n) atTop (𝓝 (U ∞)) :=
+    (U.continuous.tendsto ∞).comp ENNReal.tendsto_nat_nhds_top
+  refine le_of_tendsto h_tendsto (.of_forall fun n ↦ ?_)
+  calc U (n : ℝ≥0∞)
+  _ ≤ U x + U.deriv x * (((n : ℝ≥0∞) : EReal) - x) := U.le_add_deriv_mul (by simp) hx0 hx_top
+  _ = U x := by rw [h_deriv, zero_mul, add_zero]
+
+/-- The first-order Taylor bound `U y ≤ U x + U.deriv x * (y - x)`, generalized from
+`Utility.le_add_deriv_mul` to every pair of points at which the first-order term
+`U.deriv x * (y - x)` is neither `⊥` nor `⊤`.
+
+Some hypothesis is needed: for `x = 0` with `U 0 = ⊥` (hence `U.deriv 0 = ⊤`) and `y > 0`, the
+right-hand side is `⊥ + ⊤ = ⊥`; for `x = ∞` with `U.deriv ∞ > 0` (hence `U ∞ = ⊤`), the factor
+`y - x` is `⊥` and the right-hand side is `⊤ + ⊥ = ⊥`. -/
+lemma Utility.le_add_deriv_mul' (U : Utility) {x y : ℝ≥0∞}
+    (h_bot : U.deriv x * ((y : EReal) - x) ≠ ⊥) (h_top : U.deriv x * ((y : EReal) - x) ≠ ⊤) :
+    U y ≤ U x + U.deriv x * ((y : EReal) - x) := by
+  rcases eq_or_ne x ∞ with rfl | hx_top
+  · -- at `x = ∞` the factor `y - x` is `⊥`, hence the derivative must vanish
+    simp only [EReal.coe_ennreal_top, EReal.sub_top, ne_eq] at h_bot h_top
+    have h_deriv : U.deriv ∞ = 0 := by
+      by_contra h
+      exact h_bot (EReal.mul_bot_of_pos ((U.deriv_nonneg ∞).lt_of_ne' h))
+    rw [h_deriv, zero_mul, add_zero]
+    exact U.monotone le_top
+  rcases eq_or_ne x 0 with rfl | hx0
+  · -- at `x = 0` the derivative must be finite (unless `y = 0`)
+    simp only [EReal.coe_ennreal_zero, sub_zero] at h_bot h_top ⊢
+    rcases eq_or_ne y 0 with rfl | hy0
+    · simp
+    have h_deriv : U.deriv 0 ≠ ⊤ := by
+      intro h_eq
+      rw [h_eq] at h_top
+      exact h_top (EReal.top_mul_of_pos (EReal.coe_ennreal_pos.mpr hy0.bot_lt))
+    rcases eq_or_ne y ∞ with rfl | hy_top
+    · -- at `y = ∞` the derivative must vanish, and `U` is constant
+      have h_deriv0 : U.deriv 0 = 0 := by
+        by_contra h
+        rw [EReal.coe_ennreal_top] at h_top
+        exact h_top (EReal.mul_top_of_pos ((U.deriv_nonneg 0).lt_of_ne' h))
+      have h_deriv1 : U.deriv 1 = 0 :=
+        le_antisymm (h_deriv0 ▸ U.deriv_le_deriv_zero 1) (U.deriv_nonneg 1)
+      calc U ∞
+      _ ≤ U 1 := U.apply_top_le_of_deriv_eq_zero one_ne_zero (by simp) h_deriv1
+      _ ≤ U 0 + U.deriv 0 * ((1 : ℝ≥0∞) : EReal) := U.le_add_deriv_zero_mul h_deriv (by simp)
+      _ = U 0 + U.deriv 0 * ((∞ : ℝ≥0∞) : EReal) := by rw [h_deriv0, zero_mul, zero_mul]
+    · exact U.le_add_deriv_zero_mul h_deriv hy_top
+  rcases eq_or_ne y ∞ with rfl | hy_top
+  · -- at `y = ∞` with `x` finite nonzero, the derivative must vanish at `x`
+    have h_sub : ((∞ : ℝ≥0∞) : EReal) - x = ⊤ := by
+      rw [EReal.coe_ennreal_top, ← EReal.coe_ennreal_toReal hx_top, EReal.top_sub_coe]
+    rw [h_sub] at h_top ⊢
+    have h_deriv : U.deriv x = 0 := by
+      by_contra h
+      exact h_top (EReal.mul_top_of_pos ((U.deriv_nonneg x).lt_of_ne' h))
+    rw [h_deriv, zero_mul, add_zero]
+    exact U.apply_top_le_of_deriv_eq_zero hx0 hx_top h_deriv
+  · exact U.le_add_deriv_mul hy_top hx0 hx_top
+
 lemma Utility.tendsto_deriv_real_atTop (U : Utility) {b : ℝ} (hU_le : ∀ x : ℝ≥0∞, U x ≤ b) :
     Tendsto (deriv U.real) atTop (𝓝 0) := by
   have hb (y : ℝ) (hy : 0 < y) : U.real y ≤ b := by
