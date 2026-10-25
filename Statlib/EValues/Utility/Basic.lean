@@ -687,13 +687,13 @@ theorem Utility.eintegral_le_map {α : Type*} {mα : MeasurableSpace α}
       · simp [Utility.deriv, hX_int_zero, hX_int_top]
       · refine eintegrable_of_eintegral_ne_bot ?_
         rw [eintegral_sub']
-        · simp [sub_eq_add_neg, EReal.add_eq_bot_iff, hX_int_top, eintegral_eq_lintegral]
+        · simp [sub_eq_add_neg, EReal.add_eq_bot_iff, hX_int_top]
         · fun_prop
         · fun_prop
         · simp [hX_int_top]
         · simp
       simp only [eintegral_const, measure_univ, EReal.coe_ennreal_one, mul_one, mul_eq_zero]
-      rw [eintegral_eq_lintegral, EReal.sub_self (by simpa) (by simp)]
+      rw [eintegral_coe_ennreal, EReal.sub_self (by simpa) (by simp)]
       simp
     rw [eintegral_add', h_int_eq]
     rotate_left
