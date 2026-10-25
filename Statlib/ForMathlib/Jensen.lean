@@ -88,20 +88,18 @@ theorem Inv.map_lintegral_le [IsProbabilityMeasure μ] (hf : AEMeasurable f μ)
     · have : ∫ᵉ x, Inv.deriv y * ((f x) - y) ∂μ = 0 := by
         rw [eintegral_const_mul (by simp) (deriv_inv_ne_top h0) h_eint, eintegral_sub]
         rotate_left
-        · exact eintegrable_of_nonneg (fun x ↦ by positivity)
         · fun_prop
-        · exact eintegrable_const
         · fun_prop
-        · simp [eintegral_eq_lintegral, h_int_top]
+        · exact eintegrable_const _
+        · simp [h_int_top]
         · simp
         simp only [eintegral_const, measure_univ, EReal.coe_ennreal_one, mul_one, mul_eq_zero, y]
         right
-        rw [eintegral_eq_lintegral, EReal.sub_self (by simp [h_int_top]) (by simp)]
+        rw [eintegral_coe_ennreal, EReal.sub_self (by simp [h_int_top]) (by simp)]
       rw [this]
-      simp [eintegral_const, ← lintegral_eq_eintegral, y]
+      simp [y]
     · fun_prop
     · fun_prop
-    · exact eintegrable_const
     · exact h_eint.const_mul (by simp) (deriv_inv_ne_top h0)
     · simp
     · simp [y, h0]
@@ -214,7 +212,7 @@ theorem Inv.ae_eq_const_or_map_lintegral_lt' [IsProbabilityMeasure μ] (hf : Mea
   · have h_cvx_lt x (hx : f x ≠ ∞) := Inv.lt_add_deriv_mul (y := ∫⁻ x, f x ∂μ) hx h_int_ne_zero
     rw [lintegral_eq_eintegral, lintegral_eq_eintegral (μ := μ.restrict {y | f y ≠ ∫⁻ z, f z ∂μ})]
     refine EReal.toENNReal_lt_toENNReal ?_ ?_
-    · rw [eintegral_eq_lintegral]
+    · rw [eintegral_coe_ennreal]
       exact EReal.coe_ennreal_nonneg _
     have transform_eint_deriv : ∫ᵉ x in {y | f y ≠ ∫⁻ z, f z ∂μ},
         (f x)⁻¹ - Inv.deriv (∫⁻ z, f z ∂μ) * (f x - (∫⁻ z, f z ∂μ)) ∂μ =
@@ -226,22 +224,21 @@ theorem Inv.ae_eq_const_or_map_lintegral_lt' [IsProbabilityMeasure μ] (hf : Mea
         exact eintegrable_of_nonneg fun _ ↦ by positivity
       rw [eintegral_sub]
       rotate_left
-      · exact eintegrable_of_nonneg fun _ ↦ by positivity
+      · fun_prop
       · fun_prop
       · exact h_eint.const_mul (by simp) (deriv_inv_ne_top h_int_ne_zero)
-      · fun_prop
       · left
-        rw [eintegral_eq_lintegral, ne_eq, EReal.coe_ennreal_eq_top_iff]
+        rw [eintegral_coe_ennreal, ne_eq, EReal.coe_ennreal_eq_top_iff]
         refine ne_top_of_le_ne_top h_int_inv_top ?_
         exact setLIntegral_le_lintegral _ _
-      · simp [eintegral_eq_lintegral]
+      · simp
       congr
       rw [eintegral_const_mul (by simp) _ h_eint]
       exact deriv_inv_ne_top h_int_ne_zero
     have eint_sub_eq_zero : ∫ᵉ x in {y | f y ≠ ∫⁻ z, f z ∂μ}, (f x - ∫⁻ z, f z ∂μ) ∂μ = 0 := by
       calc
       _ = ∫ᵉ x, (f x - ∫⁻ z, f z ∂μ) ∂μ := by
-        nth_rw 2 [← eintegral_add_compl (A := {y | f y = ∫⁻ z, f z ∂μ})]
+        nth_rw 2 [← eintegral_add_compl (s := {y | f y = ∫⁻ z, f z ∂μ})]
         swap; · exact measurableSet_eq_fun hf measurable_const
         suffices h_zero : ∫ᵉ x in {y | f y = ∫⁻ z, f z ∂μ}, (f x - ∫⁻ z, f z ∂μ) ∂μ = 0 by
           rw [h_zero, zero_add]
@@ -254,13 +251,12 @@ theorem Inv.ae_eq_const_or_map_lintegral_lt' [IsProbabilityMeasure μ] (hf : Mea
         rw [hx, EReal.sub_self (by simp [h_int_top]) (by simp)]
       _ = 0 := by
         rw [eintegral_sub]
-        · rw [eintegral_eq_lintegral]
+        · rw [eintegral_coe_ennreal]
           simp only [eintegral_const, measure_univ, EReal.coe_ennreal_one, mul_one]
           rw [EReal.sub_self (by simp [h_int_top]) (by simp)]
-        · exact eintegrable_of_nonneg fun x ↦ by positivity
         · fun_prop
-        · exact eintegrable_const
         · fun_prop
+        · exact eintegrable_const _
         · simp [h_int_top]
         · simp
     calc ∫ᵉ x in {y | f y ≠ ∫⁻ z, f z ∂μ}, ((∫⁻ y, f y ∂μ)⁻¹ : ℝ≥0∞) ∂μ

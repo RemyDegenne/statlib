@@ -4,12 +4,10 @@ import Statlib.EValues.DPI
 import Statlib.EValues.EVariable
 import Statlib.EValues.Utility.Basic
 import Statlib.EValues.Utility.Log
-import Statlib.ForMathlib.Algebra.Order.Group.PosPart
 import Statlib.ForMathlib.Convex
 import Statlib.ForMathlib.ENNReal
 import Statlib.ForMathlib.EReal
 import Statlib.ForMathlib.ISup
-import Statlib.ForMathlib.MeasureTheory.Integral.EReal.AuxLemmas
 import Statlib.ForMathlib.MeasureTheory.Integral.EReal.Bochner
 import Statlib.ForMathlib.MeasureTheory.Integral.EReal.EIntegrable
 import Statlib.ForMathlib.MeasureTheory.Integral.EReal.EIntegral

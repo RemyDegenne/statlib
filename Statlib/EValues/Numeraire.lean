@@ -162,7 +162,8 @@ lemma eintegral_utility_le (hX : IsAbstractNumeraireFor U X 𝓔 P) (hY_mem : Y 
   _ ≤ ∫ᵉ ω, U (X ω) + U.deriv (X ω) * (Y ω - X ω) ∂P := by
     refine eintegral_mono_ae ?_
     filter_upwards [ae_ne_bot_of_eintegral_ne_bot h_meas h_ne_bot,
-      ae_ne_top_of_eintegral_ne_top h_meas h_ne_bot h_ne_top] with ω h_bot h_top
+      ae_ne_top_of_eintegral_ne_top h_meas (eintegrable_of_eintegral_ne_bot h_ne_bot) h_ne_top]
+      with ω h_bot h_top
     exact U.le_add_deriv_mul' h_bot h_top
   _ = ∫ᵉ ω, U (X ω) ∂P + ∫ᵉ ω, U.deriv (X ω) * (Y ω - X ω) ∂P :=
     eintegral_add' (by fun_prop) h_meas h_ne_top h_ne_bot
@@ -538,7 +539,7 @@ lemma eintegral_eq_setEIntegral_of_eq_zero {f : 𝓧 → EReal}
 
 lemma eintegral_div_le_measure_univ [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) (hY : IsEVar Y S) :
     ∫ᵉ ω, Y ω / X ω ∂μ ≤ μ univ := by
-  rw [eintegral_of_nonneg (fun _ ↦ by positivity)]
+  rw [eintegral_eq_lintegral_of_nonneg (fun _ ↦ by positivity)]
   norm_cast
   refine le_trans (le_of_eq ?_) (hX.lintegral_div_le_measure_univ hY)
   refine lintegral_congr_ae ?_
@@ -551,19 +552,18 @@ lemma eintegral_div_le_one [IsProbabilityMeasure μ] (hX : IsNumeraire X S μ) (
 
 lemma setEIntegral_le_eintegral_of_nonneg {f : 𝓧 → EReal} (hf_nonneg : ∀ ω, 0 ≤ f ω) (s : Set 𝓧) :
     ∫ᵉ ω in s, f ω ∂μ ≤ ∫ᵉ ω, f ω ∂μ := by
-  rw [eintegral_of_nonneg hf_nonneg, eintegral_of_nonneg]
+  rw [eintegral_eq_lintegral_of_nonneg hf_nonneg, eintegral_eq_lintegral_of_nonneg]
   · norm_cast
     exact setLIntegral_le_lintegral s fun x ↦ (f x).toENNReal
   · exact hf_nonneg
 
-lemma setEIntegral_le_eintegral_of_ae_nonneg {f : 𝓧 → EReal} (hf_meas : AEMeasurable f μ)
-    (hf_nonneg : ∀ᵐ ω ∂μ, 0 ≤ f ω) (s : Set 𝓧) :
+lemma setEIntegral_le_eintegral_of_ae_nonneg {f : 𝓧 → EReal} (hf_nonneg : ∀ᵐ ω ∂μ, 0 ≤ f ω)
+    (s : Set 𝓧) :
     ∫ᵉ ω in s, f ω ∂μ ≤ ∫ᵉ ω, f ω ∂μ := by
-  rw [eintegral_of_ae_nonneg hf_meas hf_nonneg, eintegral_of_ae_nonneg]
-  · norm_cast
-    exact setLIntegral_le_lintegral s fun x ↦ (f x).toENNReal
-  · exact hf_meas.restrict
-  · exact ae_restrict_of_ae hf_nonneg
+  rw [eintegral_eq_lintegral_of_nonneg_ae hf_nonneg,
+    eintegral_eq_lintegral_of_nonneg_ae (ae_restrict_of_ae hf_nonneg)]
+  norm_cast
+  exact setLIntegral_le_lintegral s fun x ↦ (f x).toENNReal
 
 -- todo: it should really be ≤ 0 instead, but this weaker result will be useful to prove that a
 -- numeraire is `eintegrable`
@@ -600,9 +600,7 @@ lemma eintegral_sub_div_le_measure_univ [IsFiniteMeasure μ]
     rwa [ae_restrict_iff']
     exact ((measurableSet_singleton _).preimage hX.measurable).compl
   _ ≤ ∫ᵉ ω in {ω | X ω ≠ ⊤}, Y ω / X ω ∂μ := by
-    gcongr
-    intro ω
-    simp only
+    gcongr with ω
     rw [sub_eq_add_neg]
     conv_rhs => rw [← add_zero ((Y ω : EReal) / X ω)]
     gcongr
@@ -660,9 +658,7 @@ theorem eintegral_log_ge_neg_measure_univ [IsFiniteMeasure μ] (hX : IsNumeraire
     · refine ne_top_of_le_ne_top (by simp : (μ univ : EReal) ≠ ⊤) ?_
       calc ∫ᵉ ω, (1 - X ω) / X ω ∂μ
       _ ≤ ∫ᵉ ω, 1 / X ω ∂μ := by
-        refine eintegral_mono ?_
-        intro ω
-        simp only
+        refine eintegral_mono fun ω ↦ ?_
         gcongr
         rw [sub_eq_add_neg]
         conv_rhs => rw [← add_zero 1]
@@ -670,7 +666,7 @@ theorem eintegral_log_ge_neg_measure_univ [IsFiniteMeasure μ] (hX : IsNumeraire
         simp only [EReal.neg_le_zero]
         positivity
       _ = ∫⁻ ω, 1 / X ω ∂μ := by
-        rw [eintegral_of_nonneg]
+        rw [eintegral_eq_lintegral_of_nonneg]
         · congr 1
           refine lintegral_congr_ae ?_
           filter_upwards [hX.ae_ne_zero] with ω hω
@@ -685,19 +681,14 @@ theorem eintegral_log_ge_neg_measure_univ [IsFiniteMeasure μ] (hX : IsNumeraire
       calc - (μ univ : EReal)
       _ = ∫ᵉ ω, - 1 ∂μ := by simp
       _ ≤ ∫ᵉ ω, - X ω / X ω ∂μ := by
-        gcongr
-        intro ω
-        simp only
+        gcongr with ω
         by_cases hX0 : X ω = 0
         · simp [hX0]
         by_cases hX_top : X ω = ∞
         · simp [hX_top]
         rw [EReal.neg_div, EReal.div_self (by simp) (by simp [hX_top]) (by simp [hX0])]
       _ ≤ ∫ᵉ ω, (1 - X ω) / X ω ∂μ := by
-        gcongr
-        intro ω
-        simp only
-        gcongr
+        gcongr with ω
         rw [sub_eq_add_neg]
         conv_lhs => rw [← zero_add (- (X ω : EReal))]
         gcongr
@@ -732,17 +723,10 @@ theorem eintegral_log_le [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) (hY : Is
   · simp [hY_bot]
   by_cases hX_top : ∫ᵉ ω, ENNReal.log (X ω) ∂μ = ⊤
   · simp [hX_top]
-  have hY_int : EIntegrable (fun ω ↦ ENNReal.log (Y ω)) μ := by
-    by_contra h_false
-    simp [eintegral_of_not_eintegrable h_false] at hY_bot
   have h_nonpos := eintegral_log_div_nonpos' hX hY
   simp_rw [ENNReal.log_div] at h_nonpos
-  rwa [eintegral_sub hY_int, EReal.sub_nonpos] at h_nonpos
-  · have := hY.measurable
-    fun_prop
-  · exact hX.eintegrable_log
-  · have := hX.measurable
-    fun_prop
+  rwa [eintegral_sub (by have := hY.measurable; fun_prop) (by have := hX.measurable; fun_prop)
+    hX.eintegrable_log, EReal.sub_nonpos] at h_nonpos
   · simp [hX_top]
   · simp [hY_bot]
 

@@ -60,8 +60,7 @@ lemma eintegral_sub_one_ne_bot_of_isFiniteMeasure {X : 𝓧 → ℝ≥0∞} {S :
   refine ne_bot_of_le_ne_bot (b := ∫ᵉ ω, - 1 ∂μ) ?_ ?_
   · specialize hS μ hμ
     simp
-  · gcongr
-    intro x
+  · gcongr with x
     conv_lhs => rw [← zero_sub (1 : EReal)]
     refine EReal.sub_le_sub ?_ le_rfl -- add gcongr tag?
     positivity
@@ -69,6 +68,11 @@ lemma eintegral_sub_one_ne_bot_of_isFiniteMeasure {X : 𝓧 → ℝ≥0∞} {S :
 lemma IsEVar.eintegrable_sub_one {X : 𝓧 → ℝ≥0∞} (hX : IsEVar X S) (μ : Measure 𝓧) (hμ : μ ∈ S) :
     EIntegrable (fun ω ↦ (X ω : EReal) - 1) μ :=
   eintegrable_of_eintegral_ne_bot (hX.eintegral_ne_bot μ hμ)
+
+lemma eintegral_sub_one_eq_lintegral_sub {X : 𝓧 → ℝ≥0∞} (hX : Measurable X) [IsFiniteMeasure μ] :
+    ∫ᵉ ω, X ω - 1 ∂μ = ∫⁻ ω, X ω ∂μ - μ .univ := by
+  simpa using eintegral_coe_ennreal_sub (μ := μ) (u := X) (v := fun _ ↦ 1) hX.aemeasurable
+    aemeasurable_const (.inr (by simp))
 
 /-- An e-variable has expected value at most the total measure. -/
 lemma IsEVar.lintegral_le_measure_univ {X : 𝓧 → ℝ≥0∞} (hX : IsEVar X S)
@@ -79,35 +83,8 @@ lemma IsEVar.lintegral_le_measure_univ {X : 𝓧 → ℝ≥0∞} (hX : IsEVar X 
   swap
   · simp only [not_isFiniteMeasure_iff] at hμ
     simp [hμ]
-  rw [eintegral_sub_of_nonneg] at h_nonpos
-  rotate_left
-  · exact fun _ ↦ by positivity
-  · simp
-  · have := hX.measurable; fun_prop
-  · fun_prop
-  · refine ne_top_of_le_ne_top (b := ∫⁻ ω, 1 ∂μ) ?_ ?_
-    · simp
-    rw [← eintegral_eq_lintegral]
-    gcongr
-    intro x
-    simp
-  rw [eintegral_eq_lintegral] at h_nonpos
-  simpa only [eintegral_const, one_mul, EReal.sub_nonpos, EReal.coe_ennreal_le_coe_ennreal_iff]
-    using h_nonpos
-
-lemma eintegral_sub_one_eq_lintegral_sub {X : 𝓧 → ℝ≥0∞} (hX : Measurable X) [IsFiniteMeasure μ] :
-    ∫ᵉ ω, X ω - 1 ∂μ = ∫⁻ ω, X ω ∂μ - μ .univ := by
-  rw [eintegral_sub_of_nonneg]
-  · simp [eintegral_eq_lintegral]
-  · exact fun _ ↦ by positivity
-  · simp
-  · fun_prop
-  · fun_prop
-  · refine ne_top_of_le_ne_top (b := ∫⁻ ω, 1 ∂μ) (by simp) ?_
-    rw [← eintegral_eq_lintegral]
-    gcongr
-    intro x
-    simp
+  rw [eintegral_sub_one_eq_lintegral_sub hX.measurable] at h_nonpos
+  simpa only [EReal.sub_nonpos, EReal.coe_ennreal_le_coe_ennreal_iff] using h_nonpos
 
 lemma eintegral_sub_one_nonpos_iff {X : 𝓧 → ℝ≥0∞} (hX : Measurable X) [IsFiniteMeasure μ] :
     ∫ᵉ ω, X ω - 1 ∂μ ≤ 0 ↔ ∫⁻ ω, X ω ∂μ ≤ μ .univ := by
@@ -253,9 +230,7 @@ lemma IsEVar.mono (hS : ∀ μ ∈ S, IsFiniteMeasure μ)
     (hY : IsEVar Y S) (hX : Measurable X) (hXY : X ≤ Y) : IsEVar X S where
   eintegral_ne_bot μ hμ := eintegral_sub_one_ne_bot_of_isFiniteMeasure hS hμ
   eintegral_nonpos μ hμ := by
-    refine (eintegral_mono ?_).trans (hY.eintegral_nonpos μ hμ)
-    intro x
-    simp only
+    refine (eintegral_mono fun x ↦ ?_).trans (hY.eintegral_nonpos μ hμ)
     refine EReal.sub_le_sub ?_ le_rfl
     exact mod_cast hXY x
 
@@ -264,8 +239,7 @@ lemma IsRandEVar.mono (hS : ∀ μ ∈ S, IsFiniteMeasure μ)
   eintegral_ne_bot μ hμ := eintegral_sub_one_ne_bot_of_isFiniteMeasure hS hμ
   eintegral_nonpos μ hμ := by
     refine le_trans ?_ (hη.eintegral_nonpos μ hμ)
-    gcongr
-    intro x
+    gcongr with x
     refine EReal.sub_le_sub ?_ le_rfl
     norm_cast
     refine lintegral_mono' ?_ le_rfl
@@ -334,7 +308,6 @@ lemma convex_isEVar (S : Set (Measure 𝓧)) : Convex ℝ≥0∞ {Z | IsEVar Z S
       simp only [EReal.smul_ennreal_eq_mul]
       rw [eintegral_add (by fun_prop) (by fun_prop)]
       rotate_left
-      · exact (hX.eintegrable_sub_one μ hμ).const_mul (by simp) ha_top
       · exact (hY.eintegrable_sub_one μ hμ).const_mul (by simp) hb_top
       · left
         rw [eintegral_const_mul (by simp) ha_top]
@@ -413,9 +386,7 @@ lemma IsRandEVar.comp {ξ : Kernel 𝓨 ℝ≥0∞} {S : Set (Measure 𝓧)}
     rw [eintegral_comp_measure (by fun_prop)] at h'
     swap; · exact eintegrable_of_eintegral_ne_bot (h.eintegral_ne_bot _ ⟨μ, hμ, rfl⟩)
     refine le_trans ?_ h'
-    gcongr
-    intro ω
-    simp only
+    gcongr with ω
     rw [eintegral_sub_one_eq_lintegral_sub (by fun_prop)]
     simp only [measure_univ, EReal.coe_ennreal_one, Kernel.comp_apply]
     rw [Measure.lintegral_bind (by fun_prop) (by fun_prop)]
