@@ -98,7 +98,7 @@ lemma maxRandUtility_eq_maxUtility (P : Measure 𝓧) (S : Set (Measure 𝓧)) :
       · rw [isRandEVar_iff_isEVar] at hη₂
         exact hη₂.eintegral_nonpos μ hμ
       · rw [hy]
-        refine (eintegral_comp_measure_le U.measurable).trans ?_
+        refine (eintegral_comp_measure_le U.measurable.aemeasurable).trans ?_
         refine eintegral_mono fun _ ↦ ?_
         exact U.eintegral_le_map (by fun_prop)
     trans ∫ᵉ x, (U ∘ X) x ∂P

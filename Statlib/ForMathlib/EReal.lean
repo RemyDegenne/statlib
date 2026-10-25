@@ -8,7 +8,6 @@ module
 
 public import Mathlib.Analysis.SpecialFunctions.Log.ENNRealLog
 public import Mathlib.MeasureTheory.Constructions.BorelSpace.Real
-public import Statlib.ForMathlib.MeasureTheory.Integral.EReal.AuxLemmas
 
 /-! # Lemmas about EReal
 -/
@@ -361,3 +360,111 @@ lemma EReal.coe_ennreal_mul_sub {c α β : ℝ≥0∞} (h : c = ∞ → α = 0) 
       · simpa [EReal.coe_ennreal_pos] using pos_iff_ne_zero.mpr hβ0
   · rw [EReal.mul_sub_of_nonneg_of_ne_top (by positivity) (by simp [hc_top]),
       ← EReal.coe_ennreal_mul, ← EReal.coe_ennreal_mul]
+
+namespace EReal
+
+/-! ### Positive and negative parts -/
+
+@[simp]
+lemma toENNReal_posPart (x : EReal) : x⁺.toENNReal = x.toENNReal := by
+  rcases le_total 0 x with h | h <;> simp [h]
+
+@[simp]
+lemma toENNReal_negPart (x : EReal) : x⁻.toENNReal = (-x).toENNReal := by
+  rcases le_total 0 x with h | h <;> simp [negPart_def, h]
+
+/-- An extended real is the difference of its positive and negative parts, seen as elements
+of `ℝ≥0∞`. -/
+lemma coe_toENNReal_sub_coe_toENNReal_neg (x : EReal) :
+    (x.toENNReal : EReal) - (-x).toENNReal = x := by
+  rcases le_total x 0 with h | h <;> simp [h]
+
+lemma toReal_toENNReal_sub_toReal_toENNReal_neg (x : EReal) :
+    x.toENNReal.toReal - (-x).toENNReal.toReal = x.toReal := by
+  induction x with
+  | bot => simp
+  | top => simp
+  | coe x =>
+    rw [← coe_neg, toENNReal_of_ne_top (coe_ne_top _), toENNReal_of_ne_top (coe_ne_top _),
+      toReal_coe, ENNReal.toReal_ofReal', ENNReal.toReal_ofReal']
+    rcases le_total 0 x with h | h <;> simp [h]
+
+lemma toENNReal_neg_le_toENNReal_neg_add_add_toENNReal (x y : EReal) :
+    (-x).toENNReal ≤ (-(x + y)).toENNReal + y.toENNReal := by
+  induction x <;> induction y <;> try {· simp}
+  rename_i a b
+  simp only [← coe_add, ← coe_neg, toENNReal_of_ne_top (coe_ne_top _), toReal_coe]
+  calc ENNReal.ofReal (-a) = ENNReal.ofReal (-(a + b) + b) := by ring_nf
+  _ ≤ ENNReal.ofReal (-(a + b)) + ENNReal.ofReal b := ENNReal.ofReal_add_le
+
+lemma neg_coe_ennreal_sub {u v : ℝ≥0∞} (h : u ≠ ⊤ ∨ v ≠ ⊤) :
+    -((u : EReal) - v) = v - u := by
+  rw [EReal.neg_sub (.inl (by simp)) (by simpa using h), add_comm, ← sub_eq_add_neg]
+
+lemma toENNReal_coe_ennreal_sub_le (u v : ℝ≥0∞) : ((u : EReal) - v).toENNReal ≤ u := by
+  rw [toENNReal_sub (coe_ennreal_nonneg _)]
+  simp
+
+lemma toENNReal_neg_coe_ennreal_sub_le (u v : ℝ≥0∞) : (-((u : EReal) - v)).toENNReal ≤ v := by
+  by_cases h : u = ⊤ ∧ v = ⊤
+  · obtain ⟨rfl, rfl⟩ := h
+    simp
+  rw [neg_coe_ennreal_sub (by tauto), toENNReal_sub (coe_ennreal_nonneg _)]
+  simp
+
+/-- For `u v : ℝ≥0∞`, the positive and negative parts of `u - v` satisfy
+`(u - v)⁺ + v = (u - v)⁻ + u`. -/
+lemma toENNReal_coe_ennreal_sub_add (u v : ℝ≥0∞) :
+    ((u : EReal) - v).toENNReal + v = (-((u : EReal) - v)).toENNReal + u := by
+  by_cases h : u = ⊤ ∧ v = ⊤
+  · obtain ⟨rfl, rfl⟩ := h
+    simp
+  rw [neg_coe_ennreal_sub (by tauto), toENNReal_sub (coe_ennreal_nonneg _),
+    toENNReal_sub (coe_ennreal_nonneg _)]
+  simp [tsub_add_eq_max, max_comm]
+
+/-- If `a + d = c + b` in `ℝ≥0∞` with `c` and `d` finite, then `a - c = b - d` in `EReal`.
+See also `EReal.coe_ennreal_sub_eq_of_add_eq'` for finite `a` and `b`. -/
+lemma coe_ennreal_sub_eq_of_add_eq {a b c d : ℝ≥0∞} (h : a + d = c + b) (hc : c ≠ ⊤)
+    (hd : d ≠ ⊤) :
+    (a : EReal) - c = b - d := by
+  lift c to NNReal using hc
+  lift d to NNReal using hd
+  induction a with
+  | top =>
+    obtain rfl : b = ⊤ := by simpa [eq_comm] using h
+    simp [top_sub]
+  | coe a =>
+    induction b with
+    | top => simp at h
+    | coe b =>
+      norm_cast at h
+      simp only [coe_nnreal_eq_coe_real, ← coe_sub]
+      have := congrArg (fun x : NNReal ↦ (x : ℝ)) h
+      push_cast at this
+      exact_mod_cast (by linarith : (a : ℝ) - c = b - d)
+
+/-- If `a + d = c + b` in `ℝ≥0∞` with `a` and `b` finite, then `a - c = b - d` in `EReal`.
+See also `EReal.coe_ennreal_sub_eq_of_add_eq` for finite `c` and `d`. -/
+lemma coe_ennreal_sub_eq_of_add_eq' {a b c d : ℝ≥0∞} (h : a + d = c + b) (ha : a ≠ ⊤)
+    (hb : b ≠ ⊤) :
+    (a : EReal) - c = b - d := by
+  lift a to NNReal using ha
+  lift b to NNReal using hb
+  induction c with
+  | top =>
+    obtain rfl : d = ⊤ := by simpa using h
+    simp [sub_top]
+  | coe c =>
+    induction d with
+    | top =>
+      simp at h
+      exact absurd h.symm (by simp)
+    | coe d =>
+      norm_cast at h
+      simp only [coe_nnreal_eq_coe_real, ← coe_sub]
+      have := congrArg (fun x : NNReal ↦ (x : ℝ)) h
+      push_cast at this
+      exact_mod_cast (by linarith : (a : ℝ) - c = b - d)
+
+end EReal
