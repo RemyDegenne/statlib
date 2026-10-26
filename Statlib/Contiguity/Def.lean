@@ -125,6 +125,7 @@ theorem contiguous1_iff_contiguous4 {l : Filter α}
     exact hc (fun a => (s a).indicator (fun _ => 1)) hle <|
       (tendstoInMeasure_iff s P h).1 hp
 
+/- Retained for future use in the planned contiguity characterizations.
 theorem Filter.tendsto_of_forall_filter_le_exists_tendsto
     {α β : Type*} {f : α → β} {l : Filter α} {lb : Filter β}
     (h : ∀ m, m ≤ l → ∃ n, n ≤ m ∧ n.NeBot ∧ Tendsto f n lb) :
@@ -135,6 +136,7 @@ theorem Filter.tendsto_of_forall_filter_le_exists_tendsto
   obtain ⟨n, hnle, hnne, hnt⟩ := h m inf_le_left
   exact hnne.ne (eventually_false_iff_eq_bot.1 ((hnt.eventually_mem hs).mp
     (hnle (mem_inf_of_right (by simp)))))
+-/
 
 theorem Contiguous1.contiguous5 {l : Filter α} {P Q : ∀ a, ProbabilityMeasure (Ω a)}
     (hPQ : Contiguous1 l P Q) : Contiguous5 l P Q :=
