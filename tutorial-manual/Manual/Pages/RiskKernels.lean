@@ -4,7 +4,7 @@ open Verso.Genre Manual
 open Verso.Code.External
 
 set_option verso.exampleProject "../"
-set_option verso.exampleModule "Statlib.Inference"
+set_option verso.exampleModule "Statlib.Inference.Inference"
 
 #doc (Manual) "Statistical Risk and Markov Kernels" =>
 %%%
