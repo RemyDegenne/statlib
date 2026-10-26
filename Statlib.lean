@@ -14,5 +14,5 @@ import Statlib.ForMathlib.MeasureTheory.Integral.EReal.EIntegral
 import Statlib.ForMathlib.MeasureTheory.Integral.EReal.Kernel
 import Statlib.ForMathlib.MeasureTheory.Integral.EReal.Prod
 import Statlib.ForMathlib.MeasureTheory.Order.Group.Lattice
-import Statlib.Inference
-import Statlib.QMD
+import Statlib.Inference.Inference
+import Statlib.Inference.QMD
