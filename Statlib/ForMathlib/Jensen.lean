@@ -11,7 +11,24 @@ public import Mathlib.Probability.ConditionalProbability
 public import Statlib.ForMathlib.Convex
 public import Statlib.ForMathlib.MeasureTheory.Integral.EReal.EIntegral
 
-/-! # Convexity results
+/-!
+# Jensen's inequality for the inverse on `ℝ≥0∞`
+
+We prove Jensen's inequality for the convex function `x ↦ x⁻¹` on `ℝ≥0∞` and the Lebesgue integral:
+for a probability measure `μ` and an almost everywhere finite function `f`,
+`(∫⁻ x, f x ∂μ)⁻¹ ≤ ∫⁻ x, (f x)⁻¹ ∂μ`, with equality only if `f` is almost everywhere constant.
+
+## Main definitions
+
+* `Inv.deriv`: the derivative of `x ↦ x⁻¹` on `ℝ≥0∞`, with values in `EReal`.
+
+## Main statements
+
+* `Inv.map_lintegral_le`: Jensen's inequality for `x ↦ x⁻¹`.
+* `Inv.ae_eq_const_or_map_lintegral_lt`: strict Jensen's inequality: either `f` is almost
+  everywhere constant, or the inequality is strict.
+* `Inv.map_set_lintegral_le`, `Inv.ae_eq_const_or_map_set_lintegral_lt`: the same results for
+  the normalized restriction of a measure to a set of finite positive measure.
 -/
 
 @[expose] public section

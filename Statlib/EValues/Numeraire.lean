@@ -12,6 +12,18 @@ public import Statlib.EValues.Utility.Log
 /-!
 # Numeraire
 
+Let `𝓔` be a class of `ℝ≥0∞`-valued random variables, for example the e-variables for a set of
+measures, and let `U` be a utility function. A numeraire for `U` in `𝓔` under `P` is an element
+`X ∈ 𝓔` which satisfies the first-order optimality condition for the maximization of the expected
+utility over `𝓔`: `∫ U'(X) (Y - X) ∂P ≤ 0` for all `Y ∈ 𝓔`. A numeraire maximizes the expected
+utility, and it is almost surely unique if `U` is strictly concave.
+
+For the logarithmic utility and a finite measure, the first-order condition is equivalent to
+`∫⁻ Y / X ∂P ≤ P X.fsupport` for all `Y ∈ 𝓔`. For the class of e-variables for a set of measures
+`S`, this is the numeraire e-variable of Larsson, Ramdas and Ruf (`IsNumeraire`).
+
+The existence of the numeraire is proved in `Statlib.EValues.NumeraireExistence`.
+
 ## Main definitions
 
 * `IsNumeraireFor U X 𝓔 P`: `X ∈ 𝓔` satisfies the first-order optimality condition
@@ -31,7 +43,12 @@ public import Statlib.EValues.Utility.Log
   characterized by `∫⁻ Y / X ≤ P X.fsupport` for all `Y ∈ 𝓔`.
 * `isNumeraire_iff_isLogNumeraireFor`: for a finite measure, `IsNumeraire X S μ` is
   `IsLogNumeraireFor` for the class of e-variables for `S`.
+* `IsNumeraire.eintegral_log_le`: the numeraire e-variable maximizes the expected logarithm.
 
+## References
+
+* M. Larsson, A. Ramdas, J. Ruf, *The numeraire e-variable and reverse information projection*
+  (2025).
 -/
 
 @[expose] public section

@@ -9,23 +9,30 @@ module
 public import Statlib.EValues.EVariable
 
 /-!
-# TODO
+# Classes of e-variables
+
+The existence proof of the numeraire (`Statlib.EValues.NumeraireExistence`) uses only a few
+properties of the class `{X | IsEVar X S}` of e-variables for a set of measures `S`: it consists of
+measurable functions, contains `1`, is convex and is closed under `liminf` of sequences. This file
+isolates those properties in the predicate `IsEVarClass`, so that the results also apply to classes
+which are not of the form `{X | IsEVar X S}`, for example classes obtained by adding a constraint
+such as adaptedness.
 
 ## Main definitions
 
 * `IsEVarClass 𝓔`: `𝓔` is a set of measurable functions containing `1`, convex and closed under
   `liminf` of sequences.
+* `midSeq X`: the iterated midpoints of a sequence `X`, a convex combination of `X 0, …, X n` with
+  positive weights.
 
 ## Main statements
 
-* `isEVarClass_isEVar`: the e-variables for a set of finite measures form such a class. So the
-  results proved for a class subsume the corresponding ones for e-variables.
-* `IsEVarClass.inter`: an intersection of a class with a convex, `liminf`-closed set containing `1`
-  is again a class. This is the operation that adds a constraint such as
-  adaptedness.
-* `IsEVarClass.exists_forall_ae_eq_top`: **the class has a `P`-maximal set of infinities**, with no
-  hypothesis beyond `IsEVarClass`. The proof maximizes the measure of the set of infinities along a
-  sequence and takes iterated midpoints, which are infinite as soon as one of their terms is.
+* `isEVarClass_isEVar`: the e-variables for a set of finite measures form an `IsEVarClass`. The
+  results proved for a class thus apply to e-variables.
+* `IsEVarClass.inter`: the intersection of a class with a convex, `liminf`-closed set containing `1`
+  is again a class.
+* `IsEVarClass.exists_forall_ae_eq_top`: for a finite measure `P`, some element of the class is
+  infinite wherever any other element is, up to a `P`-null set.
 -/
 
 @[expose] public section
@@ -43,8 +50,7 @@ variable {𝓧 : Type*} [MeasurableSpace 𝓧] {P : Measure 𝓧} {S : Set (Meas
 of the numeraire uses: it consists of measurable functions, contains the constant `1`, is convex,
 and is closed under `liminf` of sequences.
 
-The class of e-variables for a set of finite measures is an example (`isEVarClass_isEVar`), and so
-is the class of e-processes (`EValues.EProcess`), which is not of that form. -/
+The class of e-variables for a set of finite measures is an example (`isEVarClass_isEVar`). -/
 structure IsEVarClass (𝓔 : Set (𝓧 → ℝ≥0∞)) : Prop where
   measurable ⦃X⦄ (hX : X ∈ 𝓔) : Measurable X
   one_mem : 1 ∈ 𝓔
@@ -62,8 +68,7 @@ lemma isEVarClass_isEVar (S : Set (Measure 𝓧)) (hS : ∀ μ ∈ S, IsFiniteMe
   liminf_mem _ hX := isEVar_liminf hX hS
 
 /-- Adding a constraint: the intersection of a class with a convex, `liminf`-closed set containing
-`1` is again a class. This is how adaptedness is added to the
-anytime-validity constraint in `EValues.EProcess`. -/
+`1` is again a class. -/
 lemma IsEVarClass.inter (h𝓔 : IsEVarClass 𝓔) {C : Set (𝓧 → ℝ≥0∞)} (hC_one : 1 ∈ C)
     (hC_convex : Convex ℝ≥0∞ C)
     (hC_liminf : ∀ X : ℕ → 𝓧 → ℝ≥0∞, (∀ n, X n ∈ C) → (fun ω ↦ liminf (X · ω) atTop) ∈ C) :
@@ -78,11 +83,9 @@ section TopSet
 /-! ### The maximal set of infinities
 
 The existence proof of the numeraire needs one element of the class to be infinite wherever any
-other element is. For the class of e-variables this can be obtained from `acSet`, hence from the
-Lebesgue decomposition of `P` along `S`. For an abstract class no such decomposition is available,
-and none is needed: the property follows from `IsEVarClass` alone, by maximizing the measure of the
-set of infinities along a sequence and taking iterated midpoints, which are infinite as soon as one
-of their terms is. -/
+other element is. This follows from `IsEVarClass` alone: we maximize the measure of the set of
+infinities along a sequence and take iterated midpoints, which are infinite as soon as one of their
+terms is. -/
 
 /-- Iterated midpoints of a sequence: a convex combination of `X 0, …, X n` in which every term
 has a positive weight, so it takes the value `∞` as soon as one of them does. -/
@@ -131,12 +134,8 @@ lemma midSeq_eq_top {X : ℕ → 𝓧 → ℝ≥0∞} {x : 𝓧} {n : ℕ} (hn :
     simp only [Pi.add_apply, Pi.smul_apply, smul_eq_mul]
     rcases h_top with h | h <;> simp [h, ENNReal.mul_top h_inv]
 
-/-- **A class of e-variables has a `P`-maximal set of infinities.** Some element of `𝓔` is `∞`
-wherever any other element of `𝓔` is, up to a `P`-null set.
-
-This is the only ingredient of the existence proof of the numeraire beyond the utility
-maximization, and it needs no hypothesis besides `IsEVarClass`: in particular it does not need the
-Lebesgue decomposition along a set of measures that `acSet` is built from. -/
+/-- **A class of e-variables has a `P`-maximal set of infinities.** For a finite measure `P`, some
+element of `𝓔` is `∞` wherever any other element of `𝓔` is, up to a `P`-null set. -/
 theorem IsEVarClass.exists_forall_ae_eq_top (h𝓔 : IsEVarClass 𝓔) (P : Measure 𝓧)
     [IsFiniteMeasure P] :
     ∃ Z ∈ 𝓔, ∀ X ∈ 𝓔, ∀ᵐ x ∂P, X x = ∞ → Z x = ∞ := by

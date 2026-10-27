@@ -14,9 +14,9 @@ public import Statlib.ForMathlib.MeasureTheory.Komlos
 We prove that a class of e-variables `𝓔` (an `IsEVarClass`) has a numeraire under a finite measure
 `P`, for every bounded utility function and for the logarithmic utility.
 
-The proof uses only that the class consists of measurable functions, contains `1`, is convex, is
-closed under `liminf` of sequences. The e-variables for a set of
-finite measures are an example (`isEVarClass_isEVar`).
+The proof uses only that the class consists of measurable functions, contains `1`, is convex and
+is closed under `liminf` of sequences (`IsEVarClass`). The e-variables for a set of finite measures
+are an example (`isEVarClass_isEVar`).
 
 The steps are:
 
@@ -29,9 +29,9 @@ The steps are:
   condition, hence is a numeraire for the bounded utility.
 * `IsEVarClass.exists_isLogNumeraireFor`: a numeraire for the logarithmic utility, obtained from
   the numeraires of the bounded approximations `boundedLogUtility` of the logarithm by letting the
-  bound tend to infinity.
+  bound tend to infinity, using again a Komlós-type lemma and Fatou.
 
-The compactness input is the Komlós lemma `MeasureTheory.komlos_ennreal`.
+The Komlós-type lemma is `MeasureTheory.komlos_ennreal`.
 
 ## Main definitions
 
@@ -44,6 +44,13 @@ The compactness input is the Komlós lemma `MeasureTheory.komlos_ennreal`.
 * `IsEVarClass.exists_isNumeraireFor`: existence of the numeraire for a bounded utility.
 * `IsEVarClass.exists_isLogNumeraireFor`: existence of the numeraire for the logarithmic utility.
 * `exists_isNumeraire`: existence of the numeraire of the e-variables for a set of finite measures.
+* `isLogNumeraireFor_logNumeraire`, `isNumeraire_numeraire`: `logNumeraire P 𝓔` and
+  `numeraire P S` are numeraires.
+
+## References
+
+* M. Larsson, A. Ramdas, J. Ruf, *The numeraire e-variable and reverse information projection*
+  (2025). The existence proof follows its Lemmas 2.9 and 2.10.
 -/
 
 @[expose] public section

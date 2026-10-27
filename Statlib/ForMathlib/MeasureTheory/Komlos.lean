@@ -27,11 +27,13 @@ The proof has two steps.
   sequence, some forward convex combinations make the midpoint defect
   `φ (g n) / 2 + φ (g m) / 2 - φ ((g n + g m) / 2)` arbitrarily small for large `n` and `m`.
   This is done by choosing `g n` to almost minimize `φ` over the convex hull of the `n`-th tail.
-* `komlos_ennreal`: we apply `komlos_convex` to `φ Y = ∫ exp (-Y) ^ 2 ∂P`. Since
+* `MeasureTheory.komlos_ennreal_of_isFiniteMeasure`: for a finite measure `P`, we apply
+  `komlos_convex` to `φ Y = ∫ exp (-Y) ^ 2 ∂P`. Since
   `exp (-(x + y) / 2) ^ 2 = exp (-x) * exp (-y)`, the midpoint defect of `φ` is exactly half the
   squared `L²` distance between `exp (-g n)` and `exp (-g m)`. Hence `exp (-g n)` is Cauchy in
   `L²`, a subsequence converges almost everywhere, and so does the corresponding subsequence of
-  `g n`, since `x ↦ exp (-x)` is a homeomorphism from `ℝ≥0∞` onto `[0, 1]`.
+  `g n`, since `x ↦ exp (-x)` is a homeomorphism from `ℝ≥0∞` onto `[0, 1]`. The case of an
+  s-finite measure follows by passing to an equivalent finite measure.
 
 ## Main statements
 
