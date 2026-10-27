@@ -134,19 +134,19 @@ lemma expNeg_le_one (x : ℝ≥0∞) : expNeg x ≤ 1 := by
   rw [expNeg_of_ne_top hx, Real.exp_le_one_iff, neg_nonpos]
   exact ENNReal.toReal_nonneg
 
-lemma exp_neg_coe_ne_top (x : ℝ≥0∞) : EReal.exp (-x) ≠ ∞ :=
+lemma _root_.EReal.exp_neg_coe_ennreal_ne_top (x : ℝ≥0∞) : EReal.exp (-x) ≠ ∞ :=
   ne_top_of_le_ne_top ENNReal.one_ne_top
     (EReal.exp_le_one_iff.mpr (EReal.neg_le_zero.mpr (EReal.coe_ennreal_nonneg x)))
 
 lemma continuous_expNeg : Continuous expNeg :=
   ENNReal.continuousOn_toReal.comp_continuous
     (ENNReal.continuous_exp.comp (continuous_neg.comp continuous_coe_ennreal_ereal))
-    exp_neg_coe_ne_top
+    EReal.exp_neg_coe_ennreal_ne_top
 
 lemma expNeg_injective : Function.Injective expNeg := by
   intro x y h
-  rw [expNeg, expNeg, ENNReal.toReal_eq_toReal_iff' (exp_neg_coe_ne_top x)
-    (exp_neg_coe_ne_top y)] at h
+  rw [expNeg, expNeg, ENNReal.toReal_eq_toReal_iff' (EReal.exp_neg_coe_ennreal_ne_top x)
+    (EReal.exp_neg_coe_ennreal_ne_top y)] at h
   exact_mod_cast neg_injective (EReal.exp_strictMono.injective h)
 
 lemma isClosedEmbedding_expNeg : Topology.IsClosedEmbedding expNeg :=

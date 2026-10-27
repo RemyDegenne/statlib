@@ -20,13 +20,14 @@ are an example (`isEVarClass_isEVar`).
 
 The steps are:
 
-* `IsEVarClass.exists_max_eintegral_utility`: a maximizer of a bounded utility exists in the class,
-  by a maximizing sequence, a Komlós-type lemma and Fatou.
+* `IsEVarClass.exists_max_eintegral_utility`: a maximizer of a bounded, concave and upper
+  semicontinuous utility exists in the class, by a maximizing sequence, a Komlós-type lemma and
+  Fatou.
 * `IsEVarClass.exists_max_eintegral_utility_ae_lt_top`: the maximizer can moreover be taken infinite
   wherever any element of the class is, by boosting it with an infinitesimal amount of the maximal
   element of `IsEVarClass.exists_forall_ae_eq_top`.
-* `isNumeraireFor_numeraireOfBounded`: that maximizer satisfies the first order optimality
-  condition, hence is a numeraire for the bounded utility.
+* `IsEVarClass.exists_isNumeraireFor`: for a bounded utility, that maximizer satisfies the first
+  order optimality condition, hence is a numeraire.
 * `IsEVarClass.exists_isLogNumeraireFor`: a numeraire for the logarithmic utility, obtained from
   the numeraires of the bounded approximations `boundedLogUtility` of the logarithm by letting the
   bound tend to infinity, using again a Komlós-type lemma and Fatou.
@@ -35,7 +36,6 @@ The Komlós-type lemma is `MeasureTheory.komlos_ennreal`.
 
 ## Main definitions
 
-* `numeraireOfBounded`: a numeraire for a bounded utility.
 * `logNumeraire P 𝓔`: a numeraire for the logarithmic utility in the class `𝓔`.
 * `numeraire P S`: the numeraire of the e-variables for the set of measures `S`.
 
@@ -108,9 +108,10 @@ lemma convex_eintegral_utility_ge [IsFiniteMeasure P] (u : EReal)
     exact hU_ccv.2 (by simp : Y ω ∈ Set.univ) (by simp) ha hb hab
 
 /-- **Existence of a utility maximizer in an abstract class of e-variables.** For a bounded,
-continuous and concave utility `U`, some element of `𝓔` maximizes `∫ᵉ U ∘ X ∂P` over `𝓔`. -/
+upper semicontinuous and concave utility `U`, some element of `𝓔` maximizes `∫ᵉ U ∘ X ∂P` over
+`𝓔`. -/
 theorem IsEVarClass.exists_max_eintegral_utility (h𝓔 : IsEVarClass 𝓔)
-    (hU_ccv : ConcaveOn ℝ≥0 Set.univ U) {B : ℝ} (hU_cont : Continuous U)
+    (hU_ccv : ConcaveOn ℝ≥0 Set.univ U) {B : ℝ} (hU_usc : UpperSemicontinuous U)
     (hU_le : ∀ x : ℝ≥0∞, U x ≤ B) (P : Measure 𝓧) [IsFiniteMeasure P] :
     ∃ Y ∈ 𝓔, ∀ X ∈ 𝓔, ∫ᵉ x, U (X x) ∂P ≤ ∫ᵉ x, U (Y x) ∂P := by
   -- the set of achievable utilities, and a sequence attaining its supremum
@@ -155,11 +156,12 @@ theorem IsEVarClass.exists_max_eintegral_utility (h𝓔 : IsEVarClass 𝓔)
       simp only [Set.mem_ofPred_eq]
       simp_rw [← hu_eq]
       exact ⟨h𝓔.measurable (hX_mem _), hu_mono (by grind)⟩
-    · exact convex_eintegral_utility_ge _ hU_ccv hU_cont.measurable hU_le (by simp)
+    · exact convex_eintegral_utility_ge _ hU_ccv hU_usc.measurable hU_le (by simp)
   _ ≤ ∫ᵉ x, limsup (fun n ↦ U (Y n x)) atTop ∂P := by
     refine limsup_eintegral_le (g := fun _ ↦ .ofReal B) ?_ ?_ ?_ ?_
     · intro n
       have := h𝓔.measurable (hY_class n)
+      have := hU_usc.measurable
       fun_prop
     · intro n
       refine ae_of_all _ fun x ↦ ?_
@@ -198,11 +200,13 @@ theorem IsEVarClass.exists_max_eintegral_utility (h𝓔 : IsEVarClass 𝓔)
         have : ENNReal.ofReal B = B.toEReal.toENNReal := by simp
         rw [this]
         exact EReal.toENNReal_le_toENNReal (hU_le (Y n x))
-  _ = ∫ᵉ x, U (Ylim x) ∂P := by
-    refine eintegral_congr_ae ?_
+  _ ≤ ∫ᵉ x, U (Ylim x) ∂P := by
+    refine eintegral_mono_ae ?_
     filter_upwards [hY_tendsto] with x hx
-    rw [Tendsto.limsup_eq]
-    exact (hU_cont.tendsto _).comp hx
+    calc limsup (fun n ↦ U (Y n x)) atTop
+    _ = limsup U (map (Y · x) atTop) := limsup_comp U (Y · x) atTop
+    _ ≤ limsup U (𝓝 (Ylim x)) := limsup_le_limsup_of_le hx
+    _ ≤ U (Ylim x) := upperSemicontinuousAt_iff_limsup_le.mp (hU_usc (Ylim x))
 
 /-- **Existence of a utility maximizer of the class which is infinite wherever any element of the
 class is.** The maximizer of `IsEVarClass.exists_max_eintegral_utility` is boosted by an
@@ -211,11 +215,12 @@ does not see the boost in the limit, but the infinities do.
 
 Compared to `IsEVarClass.exists_max_eintegral_utility` this needs `U` to be monotone. -/
 theorem IsEVarClass.exists_max_eintegral_utility_ae_lt_top (h𝓔 : IsEVarClass 𝓔)
-    (hU_ccv : ConcaveOn ℝ≥0 Set.univ U) {b : ℝ} (hU_cont : Continuous U) (hU_mono : Monotone U)
+    (hU_ccv : ConcaveOn ℝ≥0 Set.univ U) {b : ℝ} (hU_usc : UpperSemicontinuous U)
+    (hU_mono : Monotone U)
     (hU_le : ∀ x : ℝ≥0∞, U x ≤ b) (P : Measure 𝓧) [IsFiniteMeasure P] :
     ∃ Y ∈ 𝓔, ∀ X ∈ 𝓔,
       (∫ᵉ x, U (X x) ∂P ≤ ∫ᵉ x, U (Y x) ∂P) ∧ (∀ᵐ x ∂P, Y x < ∞ → X x < ∞) := by
-  obtain ⟨Y, hY_mem, h_opt⟩ := h𝓔.exists_max_eintegral_utility hU_ccv hU_cont hU_le P
+  obtain ⟨Y, hY_mem, h_opt⟩ := h𝓔.exists_max_eintegral_utility hU_ccv hU_usc hU_le P
   obtain ⟨Z, hZ_mem, hZ_top⟩ := h𝓔.exists_forall_ae_eq_top P
   -- the weights of the boost
   set a : ℕ → ℝ≥0∞ := fun k ↦ ((k + 1 : ℕ) : ℝ≥0∞)⁻¹ with ha_def
@@ -246,7 +251,7 @@ theorem IsEVarClass.exists_max_eintegral_utility_ae_lt_top (h𝓔 : IsEVarClass 
     have h_ev : ∀ᶠ k in atTop, W k x = ∞ := by
       filter_upwards with k
       rw [hW_apply, hx, ENNReal.mul_top (ha_ne_zero k), add_top]
-    change liminf (fun k ↦ W k x) atTop = ∞
+    simp only [hY'_def]
     rw [liminf_congr h_ev]
     simp
   refine ⟨Y', h𝓔.liminf_mem W hW_mem, fun X hX_mem ↦ ⟨?_, ?_⟩⟩
@@ -260,27 +265,33 @@ end
 
 /-! ### The numeraire of a bounded utility -/
 
-/-- The numeraire associated with a bounded utility function. -/
-noncomputable
-def numeraireOfBounded {U : Utility} {b : ℝ} (hU_le : ∀ x : ℝ≥0∞, U x ≤ b)
+private lemma exists_max_eintegral_utility_of_le (h𝓔 : IsEVarClass 𝓔) {U : Utility} {b : ℝ}
+    (hU_le : ∀ x : ℝ≥0∞, U x ≤ b) (P : Measure 𝓧) [IsFiniteMeasure P] :
+    ∃ Y ∈ 𝓔, ∀ X ∈ 𝓔,
+      (∫ᵉ x, U (X x) ∂P ≤ ∫ᵉ x, U (Y x) ∂P) ∧ (∀ᵐ x ∂P, Y x < ∞ → X x < ∞) :=
+  h𝓔.exists_max_eintegral_utility_ae_lt_top U.concave U.continuous.upperSemicontinuous U.monotone
+    hU_le P
+
+/-- A maximizer of a bounded utility function, which is infinite wherever any element of the
+class is (see `isNumeraireFor_numeraireOfBounded`). -/
+private noncomputable def numeraireOfBounded {U : Utility} {b : ℝ} (hU_le : ∀ x : ℝ≥0∞, U x ≤ b)
     (P : Measure 𝓧) [IsFiniteMeasure P] (h𝓔 : IsEVarClass 𝓔) :
     𝓧 → ℝ≥0∞ :=
-  (h𝓔.exists_max_eintegral_utility_ae_lt_top U.concave U.continuous U.monotone hU_le P).choose
+  (exists_max_eintegral_utility_of_le h𝓔 hU_le P).choose
 
-lemma mem_numeraireOfBounded {U : Utility} {b : ℝ} (hU_le : ∀ x : ℝ≥0∞, U x ≤ b)
+private lemma mem_numeraireOfBounded {U : Utility} {b : ℝ} (hU_le : ∀ x : ℝ≥0∞, U x ≤ b)
     (P : Measure 𝓧) [IsFiniteMeasure P] (h𝓔 : IsEVarClass 𝓔) :
     numeraireOfBounded hU_le P h𝓔 ∈ 𝓔 :=
   (Classical.choose_spec
-    (h𝓔.exists_max_eintegral_utility_ae_lt_top U.concave U.continuous U.monotone hU_le P)).1
+    (exists_max_eintegral_utility_of_le h𝓔 hU_le P)).1
 
-lemma eintegral_le_numeraireOfBounded {U : Utility} {b : ℝ} (hU_le : ∀ x : ℝ≥0∞, U x ≤ b)
+private lemma eintegral_le_numeraireOfBounded {U : Utility} {b : ℝ} (hU_le : ∀ x : ℝ≥0∞, U x ≤ b)
     (P : Measure 𝓧) [IsFiniteMeasure P] (h𝓔 : IsEVarClass 𝓔)
     {X : 𝓧 → ℝ≥0∞} (hX_evar : X ∈ 𝓔) :
     ∫ᵉ x, U (X x) ∂P ≤ ∫ᵉ x, U (numeraireOfBounded hU_le P h𝓔 x) ∂P :=
-  ((Classical.choose_spec (h𝓔.exists_max_eintegral_utility_ae_lt_top U.concave U.continuous
-    U.monotone hU_le P)).2 X hX_evar).1
+  ((Classical.choose_spec (exists_max_eintegral_utility_of_le h𝓔 hU_le P)).2 X hX_evar).1
 
-lemma eintegral_numeraireOfBounded_ge {U : Utility} {b : ℝ} (hU_le : ∀ x : ℝ≥0∞, U x ≤ b)
+private lemma eintegral_numeraireOfBounded_ge {U : Utility} {b : ℝ} (hU_le : ∀ x : ℝ≥0∞, U x ≤ b)
     (P : Measure 𝓧) [IsFiniteMeasure P] (h𝓔 : IsEVarClass 𝓔) :
     U 1 * P .univ ≤ ∫ᵉ x, U (numeraireOfBounded hU_le P h𝓔 x) ∂P := calc
   U 1 * P .univ
@@ -288,26 +299,25 @@ lemma eintegral_numeraireOfBounded_ge {U : Utility} {b : ℝ} (hU_le : ∀ x : �
   _ ≤ ∫ᵉ x, U (numeraireOfBounded hU_le P h𝓔 x) ∂P :=
     eintegral_le_numeraireOfBounded hU_le P h𝓔 (h𝓔.one_mem)
 
-lemma eintegral_numeraireOfBounded_ne_bot {U : Utility} {b : ℝ} (hU_le : ∀ x : ℝ≥0∞, U x ≤ b)
-    (P : Measure 𝓧) [IsFiniteMeasure P] (h𝓔 : IsEVarClass 𝓔) :
+private lemma eintegral_numeraireOfBounded_ne_bot {U : Utility} {b : ℝ}
+    (hU_le : ∀ x : ℝ≥0∞, U x ≤ b) (P : Measure 𝓧) [IsFiniteMeasure P] (h𝓔 : IsEVarClass 𝓔) :
     ∫ᵉ x, U (numeraireOfBounded hU_le P h𝓔 x) ∂P ≠ ⊥ := by
   refine ne_bot_of_le_ne_bot ?_ (eintegral_numeraireOfBounded_ge hU_le P h𝓔)
   rw [EReal.mul_ne_bot]
   have h : U 1 ≠ ⊥ ∧ U 1 ≠ ⊤ := U.eq_coe (by simp) (by simp)
   simp [h.1, h.2]
 
-lemma lt_top_of_numeraireOfBounded_lt_top {U : Utility} {b : ℝ} (hU_le : ∀ x : ℝ≥0∞, U x ≤ b)
-    (P : Measure 𝓧) [IsFiniteMeasure P] (h𝓔 : IsEVarClass 𝓔)
+private lemma lt_top_of_numeraireOfBounded_lt_top {U : Utility} {b : ℝ}
+    (hU_le : ∀ x : ℝ≥0∞, U x ≤ b) (P : Measure 𝓧) [IsFiniteMeasure P] (h𝓔 : IsEVarClass 𝓔)
     {X : 𝓧 → ℝ≥0∞} (hX_evar : X ∈ 𝓔) :
     ∀ᵐ x ∂P, (numeraireOfBounded hU_le P h𝓔 x) < ∞ → X x < ∞ :=
-  ((Classical.choose_spec (h𝓔.exists_max_eintegral_utility_ae_lt_top U.concave U.continuous
-    U.monotone hU_le P)).2 X hX_evar).2
+  ((Classical.choose_spec (exists_max_eintegral_utility_of_le h𝓔 hU_le P)).2 X hX_evar).2
 
 section FirstOrderCondition
 
 /-- **First order optimality condition**, for e-variables bounded below by a positive constant.
 This is the main step in the proof of `eintegral_deriv_mul_le`. -/
-lemma eintegral_deriv_mul_le_of_ge (U : Utility) {b : ℝ} (hU_le : ∀ x : ℝ≥0∞, U x ≤ b)
+private lemma eintegral_deriv_mul_le_of_ge (U : Utility) {b : ℝ} (hU_le : ∀ x : ℝ≥0∞, U x ≤ b)
     (P : Measure 𝓧) [IsFiniteMeasure P] (h𝓔 : IsEVarClass 𝓔)
     {Y : 𝓧 → ℝ≥0∞} (hY : Y ∈ 𝓔) {c : ℝ≥0∞} (hc0 : c ≠ 0) (hcY : ∀ x, c ≤ Y x) :
     ∫ᵉ x, U.deriv (numeraireOfBounded hU_le P h𝓔 x)
@@ -406,7 +416,7 @@ lemma eintegral_deriv_mul_le_of_ge (U : Utility) {b : ℝ} (hU_le : ∀ x : ℝ�
         rw [hk_def, EReal.sub_nonpos]
         exact hU_le c
       refine hk_nonpos.trans ?_
-      change (0 : EReal) ≤ U.deriv (X x) * ((Y x : EReal) - X x)
+      simp only [hg_def]
       refine mul_nonneg (U.deriv_nonneg _) ?_
       rw [hX0]
       simpa using EReal.coe_ennreal_nonneg (Y x)
@@ -450,8 +460,8 @@ lemma eintegral_deriv_mul_le_of_ge (U : Utility) {b : ℝ} (hU_le : ∀ x : ℝ�
 
 /-- **First order optimality condition** for a bounded utility: the maximizer
 `numeraireOfBounded` satisfies `∫ U'(X) (Y - X) ≤ 0`, and that integral is not `⊥`. -/
-lemma eintegral_deriv_mul_numeraireOfBounded (U : Utility) {b : ℝ} (hU_le : ∀ x : ℝ≥0∞, U x ≤ b)
-    (P : Measure 𝓧) [IsFiniteMeasure P] (h𝓔 : IsEVarClass 𝓔)
+private lemma eintegral_deriv_mul_numeraireOfBounded (U : Utility) {b : ℝ}
+    (hU_le : ∀ x : ℝ≥0∞, U x ≤ b) (P : Measure 𝓧) [IsFiniteMeasure P] (h𝓔 : IsEVarClass 𝓔)
     {Y : 𝓧 → ℝ≥0∞} (hY : Y ∈ 𝓔) :
     ∫ᵉ x, U.deriv (numeraireOfBounded hU_le P h𝓔 x)
         * (Y x - numeraireOfBounded hU_le P h𝓔 x) ∂P ≤ 0
@@ -545,8 +555,8 @@ lemma eintegral_deriv_mul_numeraireOfBounded (U : Utility) {b : ℝ} (hU_le : �
   exact_mod_cast hG_nonpos
 
 /-- **The maximizer of a bounded utility is a numeraire** for that utility. -/
-theorem isNumeraireFor_numeraireOfBounded (U : Utility) {b : ℝ} (hU_le : ∀ x : ℝ≥0∞, U x ≤ b)
-    (P : Measure 𝓧) [IsFiniteMeasure P] (h𝓔 : IsEVarClass 𝓔) :
+private theorem isNumeraireFor_numeraireOfBounded (U : Utility) {b : ℝ}
+    (hU_le : ∀ x : ℝ≥0∞, U x ≤ b) (P : Measure 𝓧) [IsFiniteMeasure P] (h𝓔 : IsEVarClass 𝓔) :
     IsNumeraireFor U (numeraireOfBounded hU_le P h𝓔) 𝓔 P where
   mem := mem_numeraireOfBounded hU_le P h𝓔
   eintegral_deriv_mul_ne_bot _ hY := (eintegral_deriv_mul_numeraireOfBounded U hU_le P h𝓔 hY).2
@@ -564,7 +574,7 @@ end FirstOrderCondition
 /-! ### Existence of the numeraire for the logarithmic utility -/
 
 /-- The first order optimality condition for `boundedLogUtility`, in `ℝ≥0∞` form. -/
-lemma lintegral_harmonicDeriv_mul_le {N : ℝ} (hN : 0 < N)
+private lemma lintegral_harmonicDeriv_mul_le {N : ℝ} (hN : 0 < N)
     (P : Measure 𝓧) [IsFiniteMeasure P] (h𝓔 : IsEVarClass 𝓔)
     {Y : 𝓧 → ℝ≥0∞} (hY : Y ∈ 𝓔) :
     ∫⁻ x, harmonicDeriv N (numeraireOfBounded (boundedLogUtility_le hN) P h𝓔 x) * Y x ∂P
@@ -856,9 +866,8 @@ lemma IsLogNumeraireFor.ae_eq_logNumeraire [IsFiniteMeasure P] (h𝓔 : IsEVarCl
 /-- **Existence of the numeraire** of the e-variables for a set of finite measures. -/
 theorem exists_isNumeraire (P : Measure 𝓧) [IsFiniteMeasure P]
     (S : Set (Measure 𝓧)) (hS : ∀ μ ∈ S, IsFiniteMeasure μ) :
-    ∃ X, IsNumeraire X S P := by
-  obtain ⟨X, hX⟩ := (isEVarClass_isEVar S hS).exists_isLogNumeraireFor P
-  exact ⟨X, isNumeraire_iff_isLogNumeraireFor.mpr hX⟩
+    ∃ X, IsNumeraire X S P :=
+  (isEVarClass_isEVar S hS).exists_isLogNumeraireFor P
 
 /-- The numeraire of the e-variables for `S`, under `P` (see `isNumeraire_numeraire`). -/
 noncomputable
@@ -874,10 +883,16 @@ lemma measurable_numeraire (P : Measure 𝓧) (S : Set (Measure 𝓧)) :
     Measurable (numeraire P S) := (isEVar_numeraire P S).measurable
 
 /-- The numeraire `numeraire P S` is indeed a numeraire for `S` and `P`. -/
-lemma isNumeraire_numeraire (P : Measure 𝓧) (hS : ∀ μ ∈ S, IsFiniteMeasure μ) :
+lemma isNumeraire_numeraire (P : Measure 𝓧) [IsFiniteMeasure P]
+    (hS : ∀ μ ∈ S, IsFiniteMeasure μ) :
     IsNumeraire (numeraire P S) S P :=
-  ⟨isEVar_numeraire P S, fun _ hX ↦
-    lintegral_div_logNumeraire_le_measure_fsupport P (isEVarClass_isEVar S hS) hX⟩
+  isLogNumeraireFor_logNumeraire (isEVarClass_isEVar S hS) P
+
+/-- The numeraire `numeraire P S` attains the maximum logarithmic utility. -/
+lemma maxUtility_eq_eintegral_numeraire (P : Measure 𝓧) [IsFiniteMeasure P]
+    (hS : ∀ μ ∈ S, IsFiniteMeasure μ) :
+    maxUtility P S logUtility = ∫ᵉ x, ENNReal.log (numeraire P S x) ∂P :=
+  (isNumeraire_numeraire P hS).maxUtility_eq_eintegral
 
 lemma lintegral_div_numeraire_le (P : Measure 𝓧) (hS : ∀ μ ∈ S, IsFiniteMeasure μ)
     (hX : IsEVar X S) :
@@ -887,7 +902,7 @@ lemma lintegral_div_numeraire_le (P : Measure 𝓧) (hS : ∀ μ ∈ S, IsFinite
 lemma lintegral_div_numeraire_le_measure_univ (P : Measure 𝓧) (hS : ∀ μ ∈ S, IsFiniteMeasure μ)
     (hX : IsEVar X S) :
     ∫⁻ x, X x / numeraire P S x ∂P ≤ P .univ :=
-  (isNumeraire_numeraire P hS).lintegral_div_le_measure_univ hX
+  lintegral_div_logNumeraire_le_measure_univ P (isEVarClass_isEVar S hS) hX
 
 lemma lintegral_div_numeraire_le_one (P : Measure 𝓧) [IsProbabilityMeasure P]
     (hS : ∀ μ ∈ S, IsFiniteMeasure μ) (hX : IsEVar X S) :

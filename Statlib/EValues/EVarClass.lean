@@ -6,6 +6,7 @@ Authors: Rémy Degenne
 
 module
 
+public import Mathlib.MeasureTheory.Measure.WithDensityFinite
 public import Statlib.EValues.EVariable
 
 /-!
@@ -31,7 +32,7 @@ such as adaptedness.
   results proved for a class thus apply to e-variables.
 * `IsEVarClass.inter`: the intersection of a class with a convex, `liminf`-closed set containing `1`
   is again a class.
-* `IsEVarClass.exists_forall_ae_eq_top`: for a finite measure `P`, some element of the class is
+* `IsEVarClass.exists_forall_ae_eq_top`: for an s-finite measure `P`, some element of the class is
   infinite wherever any other element is, up to a `P`-null set.
 -/
 
@@ -101,16 +102,13 @@ omit [MeasurableSpace 𝓧] in
 lemma midSeq_succ (X : ℕ → 𝓧 → ℝ≥0∞) (n : ℕ) :
     midSeq X (n + 1) = (2 : ℝ≥0∞)⁻¹ • midSeq X n + (2 : ℝ≥0∞)⁻¹ • X (n + 1) := rfl
 
-private lemma inv_two_add_inv_two : (2 : ℝ≥0∞)⁻¹ + 2⁻¹ = 1 := by
-  rw [← two_mul, ENNReal.mul_inv_cancel (by norm_num) (by norm_num)]
-
 lemma midSeq_mem (h𝓔 : IsEVarClass 𝓔) {X : ℕ → 𝓧 → ℝ≥0∞} (hX : ∀ n, X n ∈ 𝓔) (n : ℕ) :
     midSeq X n ∈ 𝓔 := by
   induction n with
   | zero => simpa using hX 0
   | succ k ih =>
     rw [midSeq_succ]
-    exact h𝓔.convex ih (hX (k + 1)) (by simp) (by simp) inv_two_add_inv_two
+    exact h𝓔.convex ih (hX (k + 1)) (by simp) (by simp) ENNReal.inv_two_add_inv_two
 
 omit [MeasurableSpace 𝓧] in
 lemma midSeq_eq_top {X : ℕ → 𝓧 → ℝ≥0∞} {x : 𝓧} {n : ℕ} (hn : X n x = ∞) :
@@ -134,9 +132,7 @@ lemma midSeq_eq_top {X : ℕ → 𝓧 → ℝ≥0∞} {x : 𝓧} {n : ℕ} (hn :
     simp only [Pi.add_apply, Pi.smul_apply, smul_eq_mul]
     rcases h_top with h | h <;> simp [h, ENNReal.mul_top h_inv]
 
-/-- **A class of e-variables has a `P`-maximal set of infinities.** For a finite measure `P`, some
-element of `𝓔` is `∞` wherever any other element of `𝓔` is, up to a `P`-null set. -/
-theorem IsEVarClass.exists_forall_ae_eq_top (h𝓔 : IsEVarClass 𝓔) (P : Measure 𝓧)
+private lemma exists_forall_ae_eq_top_of_isFiniteMeasure (h𝓔 : IsEVarClass 𝓔) (P : Measure 𝓧)
     [IsFiniteMeasure P] :
     ∃ Z ∈ 𝓔, ∀ X ∈ 𝓔, ∀ᵐ x ∂P, X x = ∞ → Z x = ∞ := by
   have h_meas {X : 𝓧 → ℝ≥0∞} (hX : X ∈ 𝓔) : MeasurableSet {x | X x = ∞} :=
@@ -169,7 +165,7 @@ theorem IsEVarClass.exists_forall_ae_eq_top (h𝓔 : IsEVarClass 𝓔) (P : Meas
   refine ⟨Z, hZ_mem, fun Y hY ↦ ?_⟩
   -- the midpoint of `Z` and `Y` is infinite on the union of the two sets of infinities
   have hW_mem : (2 : ℝ≥0∞)⁻¹ • Z + (2 : ℝ≥0∞)⁻¹ • Y ∈ 𝓔 :=
-    h𝓔.convex hZ_mem hY (by simp) (by simp) inv_two_add_inv_two
+    h𝓔.convex hZ_mem hY (by simp) (by simp) ENNReal.inv_two_add_inv_two
   have hW_eq : {x | ((2 : ℝ≥0∞)⁻¹ • Z + (2 : ℝ≥0∞)⁻¹ • Y) x = ∞}
       = {x | Z x = ∞} ∪ {x | Y x = ∞} := by
     ext x
@@ -190,6 +186,13 @@ theorem IsEVarClass.exists_forall_ae_eq_top (h𝓔 : IsEVarClass 𝓔) (P : Meas
     rw [h_add, add_zero]
     exact h_union_le
   simpa using (ENNReal.add_le_add_iff_left (measure_ne_top P _)).mp h_le
+
+/-- **A class of e-variables has a `P`-maximal set of infinities.** For an s-finite measure `P`,
+some element of `𝓔` is `∞` wherever any other element of `𝓔` is, up to a `P`-null set. -/
+theorem IsEVarClass.exists_forall_ae_eq_top (h𝓔 : IsEVarClass 𝓔) (P : Measure 𝓧) [SFinite P] :
+    ∃ Z ∈ 𝓔, ∀ X ∈ 𝓔, ∀ᵐ x ∂P, X x = ∞ → Z x = ∞ := by
+  obtain ⟨Z, hZ, h⟩ := exists_forall_ae_eq_top_of_isFiniteMeasure h𝓔 P.toFinite
+  exact ⟨Z, hZ, fun X hX ↦ (absolutelyContinuous_toFinite P).ae_le (h X hX)⟩
 
 end TopSet
 

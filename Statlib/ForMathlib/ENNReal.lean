@@ -41,6 +41,14 @@ lemma not_mem_fsupport_iff {α β : Type*} [Top β] [Zero β] (X : α → β) (�
   rw [← Set.mem_compl_iff, fsupport_compl]
   simp
 
+/-- The finite support of `(x, y) ↦ X x * Y y` is the product of the finite supports. -/
+lemma fsupport_mul_prod {α β : Type*} (X : α → ℝ≥0∞) (Y : β → ℝ≥0∞) :
+    (fun x : α × β ↦ X x.1 * Y x.2).fsupport = X.fsupport ×ˢ Y.fsupport := by
+  ext x
+  simp only [fsupport, Set.mem_inter_iff, Set.mem_ofPred_eq, Set.mem_prod, ne_eq,
+    ENNReal.mul_eq_top, mul_eq_zero, not_or]
+  tauto
+
 end Function
 
 namespace ENNReal
