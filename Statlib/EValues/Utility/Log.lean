@@ -55,6 +55,8 @@ noncomputable def logUtility : Utility where
       analyticOn_log.contDiffOn (uniqueDiffOn_Ioi 0)
     exact ContDiffOn.congr h_diff h_eq
 
+lemma logUtility_apply (x : ℝ≥0∞) : logUtility x = ENNReal.log x := rfl
+
 @[simp]
 lemma logUtility_zero : logUtility 0 = ⊥ := by simp [logUtility]
 

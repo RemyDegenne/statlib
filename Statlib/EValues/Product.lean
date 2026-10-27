@@ -33,10 +33,27 @@ of probability measures.
 open MeasureTheory Filter
 open scoped ENNReal NNReal Topology
 
+variable {𝓧 𝓨 : Type*} {m𝓧 : MeasurableSpace 𝓧} {m𝓨 : MeasurableSpace 𝓨}
+
+namespace MeasureTheory
+
+/-- The integral of `(x, y) ↦ f x + g y` against a measure on a product is the sum of the integrals
+of `f` and `g` against the marginals, if those are not `⊥`. -/
+lemma eintegral_add_fst_snd {R : Measure (𝓧 × 𝓨)} {f : 𝓧 → EReal} {g : 𝓨 → EReal}
+    (hf : AEMeasurable f R.fst) (hg : AEMeasurable g R.snd) (hf_bot : ∫ᵉ x, f x ∂R.fst ≠ ⊥)
+    (hg_bot : ∫ᵉ y, g y ∂R.snd ≠ ⊥) :
+    ∫ᵉ p, f p.1 + g p.2 ∂R = ∫ᵉ x, f x ∂R.fst + ∫ᵉ y, g y ∂R.snd := by
+  rw [Measure.fst, eintegral_map' hf measurable_fst.aemeasurable] at hf_bot ⊢
+  rw [Measure.snd, eintegral_map' hg measurable_snd.aemeasurable] at hg_bot ⊢
+  exact eintegral_add (hf.comp_aemeasurable measurable_fst.aemeasurable)
+    (hg.comp_aemeasurable measurable_snd.aemeasurable) (eintegrable_of_eintegral_ne_bot hg_bot)
+    (.inl hf_bot) (.inr hg_bot)
+
+end MeasureTheory
+
 namespace ProbabilityTheory
 
-variable {𝓧 𝓨 : Type*} {m𝓧 : MeasurableSpace 𝓧} {m𝓨 : MeasurableSpace 𝓨}
-  {P : Measure 𝓧} {Q : Measure 𝓨} {S : Set (Measure 𝓧)} {T : Set (Measure 𝓨)}
+variable {P : Measure 𝓧} {Q : Measure 𝓨} {S : Set (Measure 𝓧)} {T : Set (Measure 𝓨)}
 
 /-- The product of two e-variables is an e-variable for the product measures. -/
 lemma IsEVar.prod {X : 𝓧 → ℝ≥0∞} {Y : 𝓨 → ℝ≥0∞} (hX : IsEVar X S) (hY : IsEVar Y T)
@@ -145,40 +162,29 @@ theorem eintegral_log_numeraire_prod [IsFiniteMeasure P] [IsFiniteMeasure Q]
     ∫ᵉ x, ENNReal.log (numeraire (P.prod Q) (Set.image2 Measure.prod S T) x) ∂(P.prod Q)
       = Q .univ * ∫ᵉ x, ENNReal.log (numeraire P S x) ∂P +
         P .univ * ∫ᵉ x, ENNReal.log (numeraire Q T x) ∂Q := by
-  have h_fst : ∫ᵉ p, ENNReal.log (numeraire P S p.1) ∂(P.prod Q)
-      = Q .univ * ∫ᵉ x, ENNReal.log (numeraire P S x) ∂P := by
-    rw [← eintegral_map (f := fun x ↦ ENNReal.log (numeraire P S x)) (by fun_prop) measurable_fst,
-      Measure.map_fst_prod, eintegral_smul_measure (by simp)]
-  have h_snd : ∫ᵉ p, ENNReal.log (numeraire Q T p.2) ∂(P.prod Q)
-      = P .univ * ∫ᵉ y, ENNReal.log (numeraire Q T y) ∂Q := by
-    rw [← eintegral_map (f := fun y ↦ ENNReal.log (numeraire Q T y)) (by fun_prop) measurable_snd,
-      Measure.map_snd_prod, eintegral_smul_measure (by simp)]
-  have h_int_snd : EIntegrable (fun p ↦ ENNReal.log (numeraire Q T p.2)) (P.prod Q) := by
-    refine (eintegrable_map (g := fun y ↦ ENNReal.log (numeraire Q T y))
-      measurable_snd.aemeasurable (by fun_prop)).mp ?_
-    rw [Measure.map_snd_prod]
-    exact (eintegrable_log_numeraire hT).smul_measure (by simp)
-  have h_nonneg_fst : 0 ≤ ∫ᵉ p, ENNReal.log (numeraire P S p.1) ∂(P.prod Q) := by
-    have := (isNumeraire_numeraire P hS).eintegral_log_nonneg
-    rw [h_fst]
-    positivity
-  have h_nonneg_snd : 0 ≤ ∫ᵉ p, ENNReal.log (numeraire Q T p.2) ∂(P.prod Q) := by
-    have := (isNumeraire_numeraire Q hT).eintegral_log_nonneg
-    rw [h_snd]
-    positivity
+  have hX := isNumeraire_numeraire P hS
+  have hY := isNumeraire_numeraire Q hT
+  have h_fst : (P.prod Q).fst = Q .univ • P := Measure.map_fst_prod
+  have h_snd : (P.prod Q).snd = P .univ • Q := Measure.map_snd_prod
   -- the numeraire of the product is the product of the numeraires
   have h_ae_eq : numeraire (P.prod Q) (Set.image2 Measure.prod S T)
       =ᵐ[P.prod Q] (fun x ↦ numeraire P S x.1 * numeraire Q T x.2) := by
-    refine ((isNumeraire_prod_numeraire P Q hS hT).ae_eq_numeraire ?_).symm
+    refine ((hX.prod hY hS hT).ae_eq_numeraire ?_).symm
     rintro _ ⟨μ, hμS, ν, hνT, rfl⟩
     have := hS μ hμS
     have := hT ν hνT
     infer_instance
   rw [eintegral_congr_ae (h_ae_eq.mono fun p hp ↦ by rw [hp])]
   simp_rw [ENNReal.log_mul_add]
-  rw [eintegral_add (by fun_prop) (by fun_prop) h_int_snd
-    (.inl (EReal.ne_bot_of_nonneg h_nonneg_fst)) (.inr (EReal.ne_bot_of_nonneg h_nonneg_snd)),
-    h_fst, h_snd]
+  rw [eintegral_add_fst_snd (f := fun x ↦ ENNReal.log (numeraire P S x))
+      (g := fun y ↦ ENNReal.log (numeraire Q T y)) (by fun_prop) (by fun_prop), h_fst, h_snd,
+    eintegral_smul_measure (by simp), eintegral_smul_measure (by simp)]
+  · rw [h_fst, eintegral_smul_measure (by simp)]
+    have := hX.eintegral_log_nonneg
+    exact EReal.ne_bot_of_nonneg (by positivity)
+  · rw [h_snd, eintegral_smul_measure (by simp)]
+    have := hY.eintegral_log_nonneg
+    exact EReal.ne_bot_of_nonneg (by positivity)
 
 /-- The maximal logarithmic utility of a product is a weighted sum of the maximal logarithmic
 utilities of the factors. -/
@@ -201,6 +207,26 @@ lemma maxUtility_prod_eq_add (P : Measure 𝓧) (Q : Measure 𝓨) [IsProbabilit
     maxUtility (P.prod Q) (Set.image2 Measure.prod S T) logUtility =
       maxUtility P S logUtility + maxUtility Q T logUtility := by
   simpa using maxUtility_prod P Q hS hT
+
+/-- The maximal logarithmic utility of a finite measure on a product is at least the sum of the
+maximal logarithmic utilities of its marginals. The two are equal for a product measure of
+probability measures (`maxUtility_prod_eq_add`). -/
+lemma maxUtility_fst_add_maxUtility_snd_le (R : Measure (𝓧 × 𝓨)) [IsFiniteMeasure R]
+    (hS : ∀ μ ∈ S, IsFiniteMeasure μ) (hT : ∀ μ ∈ T, IsFiniteMeasure μ) :
+    maxUtility R.fst S logUtility + maxUtility R.snd T logUtility
+      ≤ maxUtility R (Set.image2 Measure.prod S T) logUtility := by
+  have hX := isNumeraire_numeraire R.fst hS
+  have hY := isNumeraire_numeraire R.snd hT
+  -- the product of the numeraires of the marginals is an e-variable for the product sets
+  calc maxUtility R.fst S logUtility + maxUtility R.snd T logUtility
+  _ = ∫ᵉ p, (logUtility ∘ fun p : 𝓧 × 𝓨 ↦ numeraire R.fst S p.1 * numeraire R.snd T p.2) p ∂R := by
+    simp_rw [Function.comp_apply, logUtility_apply, ENNReal.log_mul_add]
+    rw [eintegral_add_fst_snd (f := fun x ↦ ENNReal.log (numeraire R.fst S x))
+      (g := fun y ↦ ENNReal.log (numeraire R.snd T y)) (by fun_prop) (by fun_prop)
+      hX.eintegral_log_ne_bot hY.eintegral_log_ne_bot, hX.maxUtility_eq_eintegral,
+      hY.maxUtility_eq_eintegral]
+  _ ≤ maxUtility R (Set.image2 Measure.prod S T) logUtility :=
+    (hX.isEVar.prod hY.isEVar hS hT).eintegral_le_maxUtility R logUtility
 
 /-- The product of the numeraires is a numeraire for the product measure, for a family indexed
 by `Fin n`. This is the induction that underlies `isNumeraire_pi_numeraire`. -/
