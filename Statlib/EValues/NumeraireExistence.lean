@@ -15,7 +15,7 @@ We prove that a class of e-variables `𝓔` (an `IsEVarClass`) has a numeraire u
 `P`, for every bounded utility function and for the logarithmic utility.
 
 The proof uses only that the class consists of measurable functions, contains `1`, is convex, is
-closed under `liminf` of sequences and is stable under truncation. The e-variables for a set of
+closed under `liminf` of sequences. The e-variables for a set of
 finite measures are an example (`isEVarClass_isEVar`).
 
 The steps are:
@@ -628,11 +628,10 @@ theorem IsEVarClass.exists_isLogNumeraireFor (h𝓔 : IsEVarClass 𝓔) (P : Mea
     gcongr
     rw [← ENNReal.ofReal_natCast]
     exact ENNReal.ofReal_le_ofReal (by linarith)
-  -- the key estimate
-  have key : ∀ Y : 𝓧 → ℝ≥0∞, Y ∈ 𝓔 → ∫⁻ x, Y x ∂P ≠ ∞ →
+  -- the key estimate, for an integrable function `Y` dominated by an element `Z` of the class
+  have key : ∀ Y Z : 𝓧 → ℝ≥0∞, Measurable Y → Z ∈ 𝓔 → Y ≤ Z → ∫⁻ x, Y x ∂P ≠ ∞ →
       ∫⁻ x, Y x * (Xstar x)⁻¹ ∂P ≤ P A := by
-    intro Y hY hY_int
-    have hY_meas := h𝓔.measurable hY
+    intro Y Z hY_meas hZ hYZ hY_int
     have h5 (i : ℕ) : ∫⁻ x, Y x * (Xo i x)⁻¹ ∂P
         ≤ P A + (ENNReal.ofReal ((i : ℝ) + 1))⁻¹ * ∫⁻ x, Y x ∂P := by
       calc ∫⁻ x, Y x * (Xo i x)⁻¹ ∂P
@@ -646,7 +645,11 @@ theorem IsEVarClass.exists_isLogNumeraireFor (h𝓔 : IsEVarClass 𝓔) (P : Mea
             + (ENNReal.ofReal ((i : ℝ) + 1))⁻¹ * ∫⁻ x, Y x ∂P := by
         rw [lintegral_add_left (by have := measurable_harmonicDeriv ((i : ℝ) + 1); fun_prop),
           lintegral_const_mul _ hY_meas]
-      _ ≤ _ := by gcongr; exact hfoc i hY
+      _ ≤ _ := by
+        gcongr
+        refine (lintegral_mono fun x ↦ ?_).trans (hfoc i hZ)
+        gcongr
+        exact hYZ x
     have h7 (n : ℕ) : ∫⁻ x, Y x * (W n x)⁻¹ ∂P
         ≤ P A + (ENNReal.ofReal ((n : ℝ) + 1))⁻¹ * ∫⁻ x, Y x ∂P := by
       have h := hW_mem n
@@ -699,7 +702,7 @@ theorem IsEVarClass.exists_isLogNumeraireFor (h𝓔 : IsEVarClass 𝓔) (P : Mea
       simpa using (tendsto_const_nhds (x := P A) (f := atTop (α := ℕ))).add h0
   -- `Xstar` is almost everywhere nonzero
   have hXstar_ne_zero : ∀ᵐ x ∂P, Xstar x ≠ 0 := by
-    have h := key 1 (h𝓔.one_mem) (by simp)
+    have h := key 1 1 measurable_one h𝓔.one_mem le_rfl (by simp)
     simp only [Pi.one_apply, one_mul] at h
     have h_lt := ae_lt_top' (by fun_prop) (ne_top_of_le_ne_top hPA h)
     filter_upwards [h_lt] with x hx
@@ -737,15 +740,14 @@ theorem IsEVarClass.exists_isLogNumeraireFor (h𝓔 : IsEVarClass 𝓔) (P : Mea
     filter_upwards [hXstar_ne_zero, hXstar_ne_top] with x h0 h_top hxA
     exact ⟨h_top hxA, h0⟩
   refine le_trans ?_ hA_le
-  -- reduce to bounded e-variables
+  -- reduce to the truncations of `X`, which are integrable
   have h_trunc (k : ℕ) : ∫⁻ x, (min (X x) k) / Xstar x ∂P ≤ P A := by
-    have hk_evar : (fun x ↦ min (X x) (k : ℝ≥0∞)) ∈ 𝓔 :=
-      h𝓔.min_const_mem hX _
     have hk_int : ∫⁻ x, min (X x) (k : ℝ≥0∞) ∂P ≠ ∞ := by
       refine ne_top_of_le_ne_top ?_ (lintegral_mono fun x ↦ min_le_right _ _)
       simp only [lintegral_const]
       exact ENNReal.mul_ne_top (by simp) (measure_ne_top _ _)
-    have := key _ hk_evar hk_int
+    have := key _ X ((h𝓔.measurable hX).min measurable_const) hX (fun x ↦ min_le_left _ _)
+      hk_int
     simpa only [ENNReal.div_eq_inv_mul, mul_comm] using this
   have h_mono : Monotone fun k : ℕ ↦ fun x ↦ (min (X x) (k : ℝ≥0∞)) / Xstar x := by
     intro j k hjk x

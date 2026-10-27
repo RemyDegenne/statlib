@@ -13,15 +13,15 @@ public import Statlib.EValues.EVariable
 
 ## Main definitions
 
-* `IsEVarClass 𝓔`: `𝓔` is a set of measurable functions containing `1`, convex, closed under
-  `liminf` of sequences and under truncation `X ↦ min X c`.
+* `IsEVarClass 𝓔`: `𝓔` is a set of measurable functions containing `1`, convex and closed under
+  `liminf` of sequences.
 
 ## Main statements
 
 * `isEVarClass_isEVar`: the e-variables for a set of finite measures form such a class. So the
   results proved for a class subsume the corresponding ones for e-variables.
-* `IsEVarClass.inter`: an intersection of a class with a convex, `liminf`-closed, truncation-stable
-  set containing `1` is again a class. This is the operation that adds a constraint such as
+* `IsEVarClass.inter`: an intersection of a class with a convex, `liminf`-closed set containing `1`
+  is again a class. This is the operation that adds a constraint such as
   adaptedness.
 * `IsEVarClass.exists_forall_ae_eq_top`: **the class has a `P`-maximal set of infinities**, with no
   hypothesis beyond `IsEVarClass`. The proof maximizes the measure of the set of infinities along a
@@ -50,7 +50,6 @@ structure IsEVarClass (𝓔 : Set (𝓧 → ℝ≥0∞)) : Prop where
   one_mem : 1 ∈ 𝓔
   convex : Convex ℝ≥0∞ 𝓔
   liminf_mem (X : ℕ → 𝓧 → ℝ≥0∞) (hX : ∀ n, X n ∈ 𝓔) : (fun ω ↦ liminf (X · ω) atTop) ∈ 𝓔
-  min_const_mem ⦃X⦄ (hX : X ∈ 𝓔) (c : ℝ≥0∞) : (fun ω ↦ min (X ω) c) ∈ 𝓔
 
 lemma IsEVarClass.nonempty (h𝓔 : IsEVarClass 𝓔) : 𝓔.Nonempty := ⟨1, h𝓔.one_mem⟩
 
@@ -61,22 +60,18 @@ lemma isEVarClass_isEVar (S : Set (Measure 𝓧)) (hS : ∀ μ ∈ S, IsFiniteMe
   one_mem := isEVar_one S
   convex := convex_isEVar S
   liminf_mem _ hX := isEVar_liminf hX hS
-  min_const_mem _ hX c :=
-    IsEVar.mono hS hX (by have := hX.measurable; fun_prop) fun _ ↦ min_le_left _ _
 
 /-- Adding a constraint: the intersection of a class with a convex, `liminf`-closed set containing
-`1` and stable under truncation is again a class. This is how adaptedness is added to the
+`1` is again a class. This is how adaptedness is added to the
 anytime-validity constraint in `EValues.EProcess`. -/
 lemma IsEVarClass.inter (h𝓔 : IsEVarClass 𝓔) {C : Set (𝓧 → ℝ≥0∞)} (hC_one : 1 ∈ C)
     (hC_convex : Convex ℝ≥0∞ C)
-    (hC_liminf : ∀ X : ℕ → 𝓧 → ℝ≥0∞, (∀ n, X n ∈ C) → (fun ω ↦ liminf (X · ω) atTop) ∈ C)
-    (hC_min : ∀ X ∈ C, ∀ c : ℝ≥0∞, (fun ω ↦ min (X ω) c) ∈ C) :
+    (hC_liminf : ∀ X : ℕ → 𝓧 → ℝ≥0∞, (∀ n, X n ∈ C) → (fun ω ↦ liminf (X · ω) atTop) ∈ C) :
     IsEVarClass (𝓔 ∩ C) where
   measurable _ hX := h𝓔.measurable hX.1
   one_mem := ⟨h𝓔.one_mem, hC_one⟩
   convex := h𝓔.convex.inter hC_convex
   liminf_mem X hX := ⟨h𝓔.liminf_mem X fun n ↦ (hX n).1, hC_liminf X fun n ↦ (hX n).2⟩
-  min_const_mem _ hX c := ⟨h𝓔.min_const_mem hX.1 c, hC_min _ hX.2 c⟩
 
 section TopSet
 
