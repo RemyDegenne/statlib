@@ -58,6 +58,12 @@ variable {P : Measure 𝓧} {S T : Set (Measure 𝓧)} {U : Utility} {φ : 𝓧 
 lemma maxUtility_eq_sSup : maxUtility P S U =
     sSup {y | ∃ X, IsEVar X S ∧ y = ∫ᵉ x, (U ∘ X) x ∂P} := iSup₂_eq_sSup
 
+/-- The expected utility of an e-variable is at most the maximum utility. -/
+lemma IsEVar.eintegral_le_maxUtility {X : 𝓧 → ℝ≥0∞} (hX : IsEVar X S) (P : Measure 𝓧)
+    (U : Utility) :
+    ∫ᵉ x, (U ∘ X) x ∂P ≤ maxUtility P S U :=
+  le_iSup₂ (f := fun X (_ : IsEVar X S) ↦ ∫ᵉ x, (U ∘ X) x ∂P) X hX
+
 lemma maxRandUtility_eq_sSup : maxRandUtility P S U =
     sSup {y | ∃ η, IsMarkovKernel η ∧ IsRandEVar η S ∧ y = ∫ᵉ x, U x ∂(η ∘ₘ P)} := iSup₃_eq_sSup
 
@@ -166,10 +172,8 @@ lemma _root_.MeasurableEmbedding.maxUtility_map_eq [Nonempty 𝓧] (φ : 𝓧 �
 lemma maxUtility_nonneg (P : Measure 𝓧) :
     0 ≤ maxUtility P S logUtility := by
   calc 0
-  _ ≤ ∫ᵉ x, (logUtility.toFun ∘ (fun _ ↦ 1)) x ∂P := by simp [logUtility]
-  _ ≤ maxUtility P S logUtility := by
-    refine le_iSup₂ (f := fun X _ ↦ ∫ᵉ x, (logUtility.toFun ∘ X) x ∂P) (fun _ ↦ 1) ?_
-    exact isEVar_fun_one S
+  _ ≤ ∫ᵉ x, (logUtility ∘ (fun _ ↦ 1)) x ∂P := by simp [logUtility]
+  _ ≤ maxUtility P S logUtility := (isEVar_fun_one S).eintegral_le_maxUtility P logUtility
 
 /-- The maximum utility is a convex function of the measure. -/
 lemma convexOn_maxUtility (S : Set (Measure 𝓧)) :
@@ -203,9 +207,12 @@ lemma convexOn_maxUtility (S : Set (Measure 𝓧)) :
     simp only [maxUtility, EReal.smul_ennreal_eq_mul]
     rw [EReal.iSup_ennreal_mul hb, EReal.iSup_ennreal_mul ha]
 
+/-- Mapping the measure by a measurable involution `φ` is the same as mapping the set of measures
+by `φ`. -/
 lemma maxUtility_involutive (P : Measure 𝓧) (S : Set (Measure 𝓧)) {φ : 𝓧 → 𝓧}
-    (hφ : Measurable φ) (hφ_inv : φ ∘ φ = id) :
+    (hφ : Measurable φ) (hφ_inv : Function.Involutive φ) :
     maxUtility P {μ.map φ | μ ∈ S} U = maxUtility (P.map φ) S U := by
+  replace hφ_inv : φ ∘ φ = id := hφ_inv.comp_self
   apply le_antisymm
   · calc maxUtility P {μ.map φ | μ ∈ S} U
     _ = maxUtility ((P.map φ).map φ) {μ.map φ | μ ∈ S} U := by

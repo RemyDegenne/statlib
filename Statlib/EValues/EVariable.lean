@@ -223,8 +223,27 @@ lemma _root_.Measurable.measurable_fsupport (hX : Measurable X) :
   suffices MeasurableSet {ω | X ω ≠ ⊤} ∧ MeasurableSet {ω | X ω ≠ 0} from this.1.inter this.2
   constructor <;> exact ((measurableSet_singleton _).preimage hX).compl
 
+lemma _root_.AEMeasurable.nullMeasurableSet_fsupport {μ : Measure 𝓧} (hX : AEMeasurable X μ) :
+    NullMeasurableSet X.fsupport μ :=
+  hX.nullMeasurable ((measurableSet_singleton ⊤).compl.inter (measurableSet_singleton 0).compl)
+
 lemma IsEVar.measurable_fsupport (hX : IsEVar X S) :
     MeasurableSet X.fsupport := hX.measurable.measurable_fsupport
+
+lemma measure_fsupport_eq_zero_of_ae_eq_top {μ : Measure 𝓧} {X : 𝓧 → ℝ≥0∞}
+    (hX_top : ∀ᵐ ω ∂μ, X ω = ∞) :
+    μ X.fsupport = 0 := by
+  suffices μ {x | ¬ x ∈ X.fsupportᶜ} = 0 by simpa
+  rw [← ae_iff]
+  filter_upwards [hX_top] with x hx
+  simp [hx]
+
+/-- The integral of `Y / Y` equals the measure of the finite support of `Y`. -/
+lemma lintegral_div_self_eq_measure_fsupport {μ : Measure 𝓧} (hY : AEMeasurable Y μ) :
+    ∫⁻ ω, Y ω / Y ω ∂μ = μ Y.fsupport := by
+  rw [← lintegral_indicator_one₀ hY.nullMeasurableSet_fsupport]
+  congr with ω
+  by_cases h0 : Y ω = 0 <;> by_cases h_top : Y ω = ∞ <;> simp [h0, h_top, ENNReal.div_self]
 
 lemma IsEVar.mono (hS : ∀ μ ∈ S, IsFiniteMeasure μ)
     (hY : IsEVar Y S) (hX : Measurable X) (hXY : X ≤ Y) : IsEVar X S where

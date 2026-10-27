@@ -6,6 +6,7 @@ Authors: Gaëtan Serré, Rémy Degenne
 module
 
 public import Mathlib.MeasureTheory.Integral.Lebesgue.Countable
+public import Mathlib.MeasureTheory.Integral.Lebesgue.DominatedConvergence
 public import Mathlib.MeasureTheory.Integral.Lebesgue.Markov
 public import Statlib.ForMathlib.EReal
 public import Statlib.ForMathlib.MeasureTheory.Integral.EReal.EIntegrable
@@ -33,6 +34,7 @@ difference of the Lebesgue integrals of their positive and negative parts.
   integrals, under conditions which avoid the indeterminate forms `⊤ - ⊤` and `⊥ - ⊥`.
 * `eintegral_real_const_mul`, `eintegral_neg`: compatibility with multiplication by a constant.
 * `eintegral_mono_ae`, `eintegral_strict_mono_ae`: monotonicity.
+* `limsup_eintegral_le`: Fatou's lemma on limsup for the extended integral.
 
 ## Notation
 
@@ -154,6 +156,9 @@ lemma eintegral_coe_ennreal (f : α → ℝ≥0∞) : ∫ᵉ x, f x ∂μ = ∫�
   rw [eintegral_eq_lintegral_of_nonneg (fun _ ↦ by positivity)]
   simp
 
+lemma lintegral_eq_eintegral (f : α → ℝ≥0∞) : ∫⁻ x, f x ∂μ = (∫ᵉ x, f x ∂μ).toENNReal := by
+  simp
+
 @[simp]
 lemma eintegral_const (c : EReal) (μ : Measure α) : ∫ᵉ _, c ∂μ = c * (μ Set.univ : EReal) := by
   rcases le_total 0 c with hc | hc
@@ -213,6 +218,29 @@ lemma eintegral_add_compl {s : Set α} (hs : MeasurableSet s) :
     ∫ᵉ x in s, f x ∂μ + ∫ᵉ x in sᶜ, f x ∂μ = ∫ᵉ x, f x ∂μ :=
   eintegral_add_compl₀ hs.nullMeasurableSet
 
+lemma eintegral_eq_setEIntegral_of_eq_zero {s : Set α} (hs : MeasurableSet s)
+    (h_zero : ∀ᵐ x ∂μ, x ∈ sᶜ → f x = 0) :
+    ∫ᵉ x, f x ∂μ = ∫ᵉ x in s, f x ∂μ := by
+  unfold eintegral
+  simp_rw [← lintegral_indicator hs]
+  congr 2 <;>
+  · refine lintegral_congr_ae ?_
+    filter_upwards [h_zero] with x hx
+    by_cases hxs : x ∈ s
+    · simp [hxs]
+    · simp [hx hxs, hxs]
+
+lemma setEIntegral_le_eintegral_of_ae_nonneg (hf_nonneg : ∀ᵐ x ∂μ, 0 ≤ f x) (s : Set α) :
+    ∫ᵉ x in s, f x ∂μ ≤ ∫ᵉ x, f x ∂μ := by
+  rw [eintegral_eq_lintegral_of_nonneg_ae hf_nonneg,
+    eintegral_eq_lintegral_of_nonneg_ae (ae_restrict_of_ae hf_nonneg)]
+  norm_cast
+  exact setLIntegral_le_lintegral s fun x ↦ (f x).toENNReal
+
+lemma setEIntegral_le_eintegral_of_nonneg (hf_nonneg : ∀ x, 0 ≤ f x) (s : Set α) :
+    ∫ᵉ x in s, f x ∂μ ≤ ∫ᵉ x, f x ∂μ :=
+  setEIntegral_le_eintegral_of_ae_nonneg (ae_of_all _ hf_nonneg) s
+
 lemma ae_ne_bot_of_eintegral_ne_bot (hf_meas : AEMeasurable f μ) (hf : ∫ᵉ x, f x ∂μ ≠ ⊥) :
     ∀ᵐ x ∂μ, f x ≠ ⊥ := by
   filter_upwards [ae_lt_top' (by fun_prop) (lintegral_toENNReal_neg_ne_top_of_eintegral_ne_bot hf)]
@@ -257,6 +285,52 @@ lemma eintegral_coe_ennreal_sub {u v : α → ℝ≥0∞} (hu : AEMeasurable u �
   rcases h with h | h
   · exact EReal.coe_ennreal_sub_eq_of_add_eq' h_eq (ne_top_of_le_ne_top h h_pos) h
   · exact EReal.coe_ennreal_sub_eq_of_add_eq h_eq (ne_top_of_le_ne_top h h_neg) h
+
+lemma eintegral_nonpos_iff_lintegral_le :
+    ∫ᵉ x, f x ∂μ ≤ 0 ↔ ∫⁻ x, (f x).toENNReal ∂μ ≤ ∫⁻ x, (-f x).toENNReal ∂μ := by
+  rw [eintegral, EReal.sub_nonpos, EReal.coe_ennreal_le_coe_ennreal_iff]
+
+lemma eintegral_ne_bot_iff_lintegral_ne_top :
+    ∫ᵉ x, f x ∂μ ≠ ⊥ ↔ ∫⁻ x, (-f x).toENNReal ∂μ ≠ ⊤ := by
+  rw [eintegral, ne_eq, EReal.sub_eq_bot]
+  simp
+
+open Filter in
+/-- **Fatou's lemma** on limsup for the extended integral. -/
+lemma limsup_eintegral_le {f : ℕ → α → EReal} (hf : ∀ n, Measurable (f n))
+    {g : α → ℝ≥0∞} (h_bound : ∀ n, EReal.toENNReal ∘ f n ≤ᵐ[μ] g) (h_fin : ∫⁻ x, g x ∂μ ≠ ⊤)
+    (fin_limsup : limsup (fun n ↦ (∫⁻ (x : α), (f n x).toENNReal ∂μ).toEReal) atTop ≠ ⊤ ∨
+      limsup (fun n ↦ -(∫⁻ (x : α), (-f n x).toENNReal ∂μ).toEReal) atTop ≠ ⊥) :
+    limsup (fun n ↦ ∫ᵉ x, f n x ∂μ) atTop ≤ ∫ᵉ x, limsup (fun n ↦ f n x) atTop ∂μ := by
+  simp only [eintegral]
+  refine le_trans (EReal.limsup_add_le ?_ fin_limsup) ?_
+  · left
+    refine EReal.ne_bot_of_nonneg ?_
+    rw [Filter.le_limsup_iff]
+    intro y hy
+    refine .of_forall fun n ↦ ?_
+    refine lt_of_lt_of_le hy ?_
+    norm_cast
+    simp
+  · rw [sub_eq_add_neg]
+    gcongr
+    · rw [← EReal.coe_ennreal_limsup]
+      have : ∀ x, (limsup (fun n ↦ f n x) atTop).toENNReal =
+          limsup (fun n ↦ (f n x).toENNReal) atTop :=
+        fun _ ↦ EReal.limsup_coe_ennreal _ _
+      simp_rw [this]
+      norm_cast
+      exact limsup_lintegral_le g (by fun_prop) h_bound h_fin
+    · rw [← Pi.neg_def, EReal.limsup_neg]
+      have : ∀ x, (-limsup (fun n ↦ f n x) atTop).toENNReal =
+          liminf (fun n ↦ (-f n x).toENNReal) atTop := by
+        intro x
+        rw [← EReal.liminf_neg, EReal.liminf_coe_ennreal]
+        rfl
+      simp_rw [this]
+      rw [EReal.neg_le_neg_iff, ← EReal.coe_ennreal_liminf]
+      norm_cast
+      exact lintegral_liminf_le (by fun_prop)
 
 /-! ### Linearity -/
 
@@ -452,6 +526,10 @@ theorem eintegral_map' {β : Type*} {mβ : MeasurableSpace β} {f : β → EReal
   simp only [eintegral]
   repeat rw [lintegral_map' (by fun_prop) hg]
 
+theorem eintegral_map_equiv {β : Type*} {mβ : MeasurableSpace β} (f : β → EReal) (g : α ≃ᵐ β) :
+    ∫ᵉ a, f a ∂μ.map g = ∫ᵉ a, f (g a) ∂μ := by
+  simp only [eintegral, lintegral_map_equiv]
+
 lemma eintegral_add_measure {ν : Measure α} (f : α → EReal) :
     ∫ᵉ x, f x ∂(μ + ν) = ∫ᵉ x, f x ∂μ + ∫ᵉ x, f x ∂ν := by
   simp only [eintegral, lintegral_add_measure, EReal.coe_ennreal_add]
@@ -468,6 +546,13 @@ lemma eintegral_smul_measure {c : ℝ≥0∞} (hc : c ≠ ∞) (f : α → EReal
 lemma eintegral_dirac [MeasurableSingletonClass α] (x₀ : α) (f : α → EReal) :
     ∫ᵉ x, f x ∂(Measure.dirac x₀) = f x₀ := by
   simp only [eintegral, lintegral_dirac]
+  rcases le_total (f x₀) 0 with (h | h) <;> simp [h]
+
+/-- Version of `eintegral_dirac` for a measurable function, without `MeasurableSingletonClass`. -/
+lemma eintegral_dirac' (x₀ : α) {f : α → EReal} (hf : Measurable f) :
+    ∫ᵉ x, f x ∂(Measure.dirac x₀) = f x₀ := by
+  simp only [eintegral, lintegral_dirac' _ (by fun_prop : Measurable fun x ↦ (f x).toENNReal),
+    lintegral_dirac' _ (by fun_prop : Measurable fun x ↦ (-f x).toENNReal)]
   rcases le_total (f x₀) 0 with (h | h) <;> simp [h]
 
 end MeasureTheory

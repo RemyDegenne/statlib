@@ -212,4 +212,13 @@ lemma eintegrable_of_le {b : EReal} (hf : ∀ᵐ x ∂μ, f x ≤ b) (hb : b ≠
   _ = b.toENNReal * μ .univ := by simp [lintegral_const]
   _ < ⊤ := by simp [hb, lt_top_iff_ne_top, ENNReal.mul_eq_top]
 
+lemma eintegrable_of_ge {b : EReal} (hf : ∀ x, b ≤ f x) (hb : b ≠ ⊥)
+    (P : Measure α) [IsFiniteMeasure P] :
+    EIntegrable f P := by
+  refine .inr (ne_of_lt ?_)
+  calc ∫⁻ x, (-f x).toENNReal ∂P
+  _ ≤ ∫⁻ x, (-b).toENNReal ∂P := by gcongr; simp only [EReal.neg_le_neg_iff]; exact hf _
+  _ = (-b).toENNReal * P .univ := by simp [lintegral_const]
+  _ < ⊤ := by simp [hb, lt_top_iff_ne_top, ENNReal.mul_eq_top]
+
 end MeasureTheory
