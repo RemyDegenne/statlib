@@ -38,5 +38,5 @@ You can then import Statlib from Lean files:
 
 ```
 import Statlib
-import Statlib.Inference
+import Statlib.Inference.Inference
 ```

@@ -27,5 +27,5 @@ import Statlib.ForMathlib.MeasureTheory.Komlos
 import Statlib.ForMathlib.MeasureTheory.Measure.LogLikelihoodRatio
 import Statlib.ForMathlib.MeasureTheory.Order.Group.Lattice
 import Statlib.ForMathlib.Probability.Distributions.Bernoulli
-import Statlib.Inference
-import Statlib.QMD
+import Statlib.Inference.Inference
+import Statlib.Inference.QMD

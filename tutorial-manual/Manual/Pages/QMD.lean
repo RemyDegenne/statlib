@@ -4,7 +4,7 @@ open Verso.Genre Manual
 open Verso.Code.External
 
 set_option verso.exampleProject "../"
-set_option verso.exampleModule "Statlib.QMD"
+set_option verso.exampleModule "Statlib.Inference.QMD"
 
 -- The mean-zero score proof anchor is heavy to elaborate when rendered.
 set_option maxHeartbeats 1000000

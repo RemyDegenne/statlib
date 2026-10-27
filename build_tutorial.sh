@@ -15,7 +15,7 @@ if [[ ! -d "$WEBSITE_DIR" ]]; then
 fi
 
 # Type-check the Lean library used by the tutorial examples.
-lake build Statlib.Inference
+lake build Statlib.Inference.Inference
 
 cd tutorial-manual
 
