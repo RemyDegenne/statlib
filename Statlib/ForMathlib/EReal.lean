@@ -81,7 +81,8 @@ lemma EReal.toENNReal_inv {r : EReal} (hr : 0 < r) :
     | bot => simp at hr
     | coe a =>
       simp only [EReal.toENNReal, EReal.coe_ne_top, ↓reduceIte, EReal.toReal_coe]
-      rw [if_neg EReal.inv_ne_top, EReal.toReal_inv, ENNReal.ofReal_inv_of_pos, EReal.toReal_coe]
+      rw [ite_eq_right EReal.inv_ne_top, EReal.toReal_inv, ENNReal.ofReal_inv_of_pos,
+        EReal.toReal_coe]
       simpa using hr
     | top => simp
 

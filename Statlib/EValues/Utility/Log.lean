@@ -23,6 +23,7 @@ public import Statlib.EValues.Utility.Basic
 ## Main statements
 
 * `deriv_logUtility`: The derivative of the logarithmic utility function.
+* `strictAntiOn_deriv_logUtility`: The logarithmic utility is strictly concave.
 * `deriv_boundedLogUtility`: The derivative of `boundedLogUtility`, in `ℝ≥0∞` form.
 
 -/
@@ -131,6 +132,19 @@ lemma deriv_logUtility (x : ℝ≥0∞) :
 lemma deriv_logUtility_eq_ennreal (x : ℝ≥0∞) :
     logUtility.deriv x = (1 / x : ℝ≥0∞) := by
   by_cases hx0 : x = 0 <;> simp [deriv_logUtility, hx0]
+
+lemma deriv_logUtility_zero : logUtility.deriv 0 = ⊤ := by simp [deriv_logUtility]
+
+lemma toENNReal_deriv_logUtility (x : ℝ≥0∞) : (logUtility.deriv x).toENNReal = x⁻¹ := by
+  simp [deriv_logUtility_eq_ennreal]
+
+/-- The logarithmic utility is strictly concave: its derivative is strictly antitone on
+`[0, ∞)`. -/
+lemma strictAntiOn_deriv_logUtility : StrictAntiOn logUtility.deriv (Set.Iio ∞) := by
+  intro x _ y _ hxy
+  simp only [deriv_logUtility_eq_ennreal, one_div, EReal.coe_ennreal_lt_coe_ennreal_iff,
+    ENNReal.inv_lt_inv]
+  exact hxy
 
 end Log
 

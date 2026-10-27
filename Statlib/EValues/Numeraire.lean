@@ -8,10 +8,29 @@ module
 
 public import Statlib.EValues.EVarClass
 public import Statlib.EValues.Utility.Log
-public import Statlib.ForMathlib.Jensen
 
 /-!
 # Numeraire
+
+## Main definitions
+
+* `IsNumeraireFor U X 𝓔 P`: `X ∈ 𝓔` satisfies the first-order optimality condition
+  `∫ U'(X) (Y - X) ∂P ≤ 0` for the utility function `U`, for all `Y ∈ 𝓔`.
+* `IsLogNumeraireFor X 𝓔 P`: `IsNumeraireFor` for the logarithmic utility.
+* `IsNumeraire X S μ`: `X` is an e-variable for `S` and `∫⁻ Y / X ∂μ ≤ μ X.fsupport` for all
+  e-variables `Y` for `S`.
+
+## Main statements
+
+* `IsNumeraireFor.eintegral_utility_le`: a numeraire for `U` maximizes the expected utility.
+* `isNumeraireFor_iff`: if `∫⁻ U'(X) X` is finite, `X` is a numeraire for `U` iff
+  `∫⁻ U'(X) Y ≤ ∫⁻ U'(X) X` for all `Y ∈ 𝓔`.
+* `IsNumeraireFor.ae_unique`: the numeraire for a strictly concave utility is almost surely
+  unique.
+* `isLogNumeraireFor_iff`: for a finite measure, a numeraire for the logarithmic utility is
+  characterized by `∫⁻ Y / X ≤ P X.fsupport` for all `Y ∈ 𝓔`.
+* `isNumeraire_iff_isLogNumeraireFor`: for a finite measure, `IsNumeraire X S μ` is
+  `IsLogNumeraireFor` for the class of e-variables for `S`.
 
 -/
 
@@ -35,24 +54,18 @@ lemma measure_fsupport_eq_zero_of_ae_eq_top {μ : Measure 𝓧} {X : 𝓧 → �
   simp [hx]
 
 /-- The integral of `Y / Y` equals the measure of the finite support of `Y`. -/
-lemma lintegral_div_self_eq_measure_fsupport {Y : 𝓧 → ℝ≥0∞} (hY : Measurable Y) {P : Measure 𝓧} :
+lemma lintegral_div_self_eq_measure_fsupport (hY : AEMeasurable Y P) :
     ∫⁻ ω, Y ω / Y ω ∂P = P Y.fsupport := by
-  have m_fsupport : MeasurableSet Y.fsupport := hY.measurable_fsupport
-  rw [← lintegral_add_compl _ m_fsupport, ← add_zero <| P Y.fsupport]
-  congr
-  · suffices ∀ x ∈ Y.fsupport, Y x / Y x = 1 by
-      rw [setLIntegral_congr_fun m_fsupport this]
-      simp
-    intro x hx
-    exact (ENNReal.div_eq_one_iff hx.2 hx.1).mpr rfl
-  · refine (setLIntegral_eq_zero_iff m_fsupport.compl (by fun_prop)).mpr ?_
-    filter_upwards with x hx
-    rw [Function.fsupport_compl] at hx
-    rcases hx with hx_top | hx_zero
-    · simp_all
-    · simp_all
+  rw [← lintegral_indicator_one₀ hY.nullMeasurableSet_fsupport]
+  congr with ω
+  by_cases h0 : Y ω = 0 <;> by_cases h_top : Y ω = ∞ <;> simp [h0, h_top, ENNReal.div_self]
 
-structure IsAbstractNumeraireFor (U : Utility) (X : 𝓧 → ℝ≥0∞) (𝓔 : Set (𝓧 → ℝ≥0∞)) (P : Measure 𝓧) :
+/-! ### Numeraire for a utility function -/
+
+/-- `X` is a numeraire for the utility function `U` in the class `𝓔` under `P` if `X ∈ 𝓔` and
+the first-order optimality condition `∫ U'(X) (Y - X) ∂P ≤ 0` holds for all `Y ∈ 𝓔`, where the
+integral is also required not to be `⊥`. -/
+structure IsNumeraireFor (U : Utility) (X : 𝓧 → ℝ≥0∞) (𝓔 : Set (𝓧 → ℝ≥0∞)) (P : Measure 𝓧) :
     Prop where
   mem : X ∈ 𝓔
   eintegral_deriv_mul_ne_bot : ∀ ⦃Y⦄, Y ∈ 𝓔 → ∫ᵉ ω, U.deriv (X ω) * (Y ω - X ω) ∂P ≠ ⊥
@@ -70,10 +83,20 @@ lemma eintegral_deriv_mul_ne_bot_of_zero (h_zero : ∫ᵉ ω, -U.deriv (X ω) * 
   rw [← zero_add (-(X ω : EReal)), ← sub_eq_add_neg]
   exact EReal.sub_le_sub (by positivity) le_rfl
 
-namespace IsAbstractNumeraireFor
+/-- The first-order term `∫ U'(X) (Y - X)` is the difference of `∫⁻ U'(X) Y` and
+`∫⁻ U'(X) X`, if the latter is finite. -/
+lemma eintegral_deriv_mul_sub (hX : AEMeasurable X P) (hY : AEMeasurable Y P)
+    (h_ne_top : ∫⁻ ω, (U.deriv (X ω)).toENNReal * X ω ∂P ≠ ∞) :
+    ∫ᵉ ω, U.deriv (X ω) * (Y ω - X ω) ∂P
+      = ∫⁻ ω, (U.deriv (X ω)).toENNReal * Y ω ∂P
+        - ∫⁻ ω, (U.deriv (X ω)).toENNReal * X ω ∂P := by
+  simp_rw [U.deriv_mul_sub_eq]
+  exact eintegral_coe_ennreal_sub (by fun_prop) (by fun_prop) (.inr h_ne_top)
 
-lemma congr (hX : IsAbstractNumeraireFor U X 𝓔 P) (hY_mem : Y ∈ 𝓔) (hYX : Y =ᵐ[P] X) :
-    IsAbstractNumeraireFor U Y 𝓔 P where
+namespace IsNumeraireFor
+
+lemma congr (hX : IsNumeraireFor U X 𝓔 P) (hY_mem : Y ∈ 𝓔) (hYX : Y =ᵐ[P] X) :
+    IsNumeraireFor U Y 𝓔 P where
   mem := hY_mem
   eintegral_deriv_mul_ne_bot Z hZ := by
     convert hX.eintegral_deriv_mul_ne_bot hZ using 1
@@ -84,8 +107,183 @@ lemma congr (hX : IsAbstractNumeraireFor U X 𝓔 P) (hY_mem : Y ∈ 𝓔) (hYX 
     refine eintegral_congr_ae ?_
     filter_upwards [hYX] with ω hω using by rw [hω]
 
-lemma isAbstractNumeraireFor_one_iff_isEVar (h𝓔 : IsEVarClass 𝓔) :
-    IsAbstractNumeraireFor U (1 : 𝓧 → ℝ≥0∞) 𝓔 P ↔
+/-- A numeraire `X` maximizes the expected utility over the class `𝓔`. -/
+lemma eintegral_utility_le (hX : IsNumeraireFor U X 𝓔 P) (hY_mem : Y ∈ 𝓔)
+    (hX_meas : AEMeasurable X P) (hY_meas : AEMeasurable Y P) :
+    ∫ᵉ ω, U (Y ω) ∂P ≤ ∫ᵉ ω, U (X ω) ∂P := by
+  have h_foc := hX.eintegral_deriv_mul_le hY_mem
+  have h_ne_bot : ∫ᵉ ω, U.deriv (X ω) * (Y ω - X ω) ∂P ≠ ⊥ := hX.eintegral_deriv_mul_ne_bot hY_mem
+  have h_ne_top : ∫ᵉ ω, U.deriv (X ω) * (Y ω - X ω) ∂P ≠ ⊤ :=
+    ne_top_of_le_ne_top (by simp) h_foc
+  have h_meas : AEMeasurable (fun ω ↦ U.deriv (X ω) * ((Y ω : EReal) - X ω)) P := by fun_prop
+  calc ∫ᵉ ω, U (Y ω) ∂P
+  _ ≤ ∫ᵉ ω, U (X ω) + U.deriv (X ω) * (Y ω - X ω) ∂P := by
+    refine eintegral_mono_ae ?_
+    filter_upwards [ae_ne_bot_of_eintegral_ne_bot h_meas h_ne_bot,
+      ae_ne_top_of_eintegral_ne_top h_meas (eintegrable_of_eintegral_ne_bot h_ne_bot) h_ne_top]
+      with ω h_bot h_top
+    exact U.le_add_deriv_mul' h_bot h_top
+  _ = ∫ᵉ ω, U (X ω) ∂P + ∫ᵉ ω, U.deriv (X ω) * (Y ω - X ω) ∂P :=
+    eintegral_add' (by fun_prop) h_meas h_ne_top h_ne_bot
+  _ ≤ ∫ᵉ ω, U (X ω) ∂P := by grw [h_foc]; simp
+
+/-- If `1 ∈ 𝓔`, the expected utility of a numeraire is at least `U 1 * P univ`. -/
+lemma mul_measure_univ_le_eintegral_utility (hX : IsNumeraireFor U X 𝓔 P) (h_one : 1 ∈ 𝓔)
+    (hX_meas : AEMeasurable X P) :
+    U 1 * P univ ≤ ∫ᵉ ω, U (X ω) ∂P := by
+  simpa [eintegral_const] using hX.eintegral_utility_le h_one hX_meas (by fun_prop)
+
+lemma eintegral_utility_ne_bot [IsFiniteMeasure P] (hX : IsNumeraireFor U X 𝓔 P)
+    (h_one : 1 ∈ 𝓔) (hX_meas : AEMeasurable X P) :
+    ∫ᵉ ω, U (X ω) ∂P ≠ ⊥ := by
+  refine ne_bot_of_le_ne_bot ?_ (hX.mul_measure_univ_le_eintegral_utility h_one hX_meas)
+  rw [← U.coe_real_toReal one_ne_zero ENNReal.one_ne_top,
+    ← EReal.coe_ennreal_toReal (measure_ne_top P univ)]
+  exact_mod_cast EReal.coe_ne_bot _
+
+protected lemma eintegrable_utility [IsFiniteMeasure P] (hX : IsNumeraireFor U X 𝓔 P)
+    (h_one : 1 ∈ 𝓔) (hX_meas : AEMeasurable X P) :
+    EIntegrable (fun ω ↦ U (X ω)) P :=
+  eintegrable_of_eintegral_ne_bot (hX.eintegral_utility_ne_bot h_one hX_meas)
+
+/-- A numeraire `X` for `U` satisfies `∫⁻ U'(X) Y ≤ ∫⁻ U'(X) X` for all `Y ∈ 𝓔`.
+See `isNumeraireFor_iff` for the converse. -/
+lemma lintegral_deriv_mul_le (hX : IsNumeraireFor U X 𝓔 P) (hY : Y ∈ 𝓔)
+    (hX_meas : AEMeasurable X P) (hY_meas : AEMeasurable Y P) :
+    ∫⁻ ω, (U.deriv (X ω)).toENNReal * Y ω ∂P ≤ ∫⁻ ω, (U.deriv (X ω)).toENNReal * X ω ∂P := by
+  by_cases h_top : ∫⁻ ω, (U.deriv (X ω)).toENNReal * X ω ∂P = ∞
+  · simp [h_top]
+  have h := hX.eintegral_deriv_mul_le hY
+  rwa [eintegral_deriv_mul_sub hX_meas hY_meas h_top, EReal.sub_nonpos,
+    EReal.coe_ennreal_le_coe_ennreal_iff] at h
+
+lemma ae_deriv_mul_sub_ne_bot (hX : IsNumeraireFor U X 𝓔 P) (hY : Y ∈ 𝓔)
+    (hX_meas : AEMeasurable X P) (hY_meas : AEMeasurable Y P) :
+    ∀ᵐ ω ∂P, U.deriv (X ω) * (Y ω - X ω) ≠ ⊥ :=
+  ae_ne_bot_of_eintegral_ne_bot (by fun_prop) (hX.eintegral_deriv_mul_ne_bot hY)
+
+lemma ae_deriv_mul_sub_ne_top (hX : IsNumeraireFor U X 𝓔 P) (hY : Y ∈ 𝓔)
+    (hX_meas : AEMeasurable X P) (hY_meas : AEMeasurable Y P) :
+    ∀ᵐ ω ∂P, U.deriv (X ω) * (Y ω - X ω) ≠ ⊤ :=
+  ae_ne_top_of_eintegral_ne_top (by fun_prop)
+    (eintegrable_of_eintegral_ne_bot (hX.eintegral_deriv_mul_ne_bot hY))
+    (ne_top_of_le_ne_top (by simp) (hX.eintegral_deriv_mul_le hY))
+
+/-- If `U'(0) = ∞` and `1 ∈ 𝓔`, a numeraire is almost surely positive. -/
+lemma ae_ne_zero (hX : IsNumeraireFor U X 𝓔 P) (hU : U.deriv 0 = ⊤) (h_one : 1 ∈ 𝓔)
+    (hX_meas : AEMeasurable X P) :
+    ∀ᵐ ω ∂P, X ω ≠ 0 := by
+  filter_upwards [hX.ae_deriv_mul_sub_ne_top h_one hX_meas (by fun_prop)] with ω hω hX0
+  simp [hX0, hU] at hω
+
+/-- If `U` is strictly increasing (`U'(x) > 0` for `x < ∞`), a numeraire is infinite wherever
+an element of `𝓔` is infinite. -/
+lemma ae_eq_top_of_eq_top (hX : IsNumeraireFor U X 𝓔 P) (hU : ∀ x, x ≠ ∞ → 0 < U.deriv x)
+    (hY : Y ∈ 𝓔) (hX_meas : AEMeasurable X P) (hY_meas : AEMeasurable Y P) :
+    ∀ᵐ ω ∂P, Y ω = ∞ → X ω = ∞ := by
+  filter_upwards [hX.ae_deriv_mul_sub_ne_top hY hX_meas hY_meas] with ω hω hY_top
+  by_contra hX_top
+  rw [hY_top, EReal.coe_ennreal_top, EReal.top_sub (by simpa using hX_top),
+    EReal.mul_top_of_pos (hU _ hX_top)] at hω
+  exact hω rfl
+
+/-- If `U'(∞) ≠ 0`, a numeraire is almost surely finite. -/
+lemma ae_ne_top (hX : IsNumeraireFor U X 𝓔 P) (hU : U.deriv ∞ ≠ 0) (hX_meas : AEMeasurable X P) :
+    ∀ᵐ ω ∂P, X ω ≠ ∞ := by
+  filter_upwards [hX.ae_deriv_mul_sub_ne_bot hX.mem hX_meas hX_meas] with ω hω hX_top
+  rw [hX_top, EReal.coe_ennreal_top, EReal.sub_top,
+    EReal.mul_bot_of_pos ((U.deriv_nonneg ∞).lt_of_ne' hU)] at hω
+  exact hω rfl
+
+/-- **Uniqueness of the numeraire**: for a strictly concave utility, the numeraire is almost
+surely unique. -/
+theorem ae_unique (hX : IsNumeraireFor U X 𝓔 P) (hY : IsNumeraireFor U Y 𝓔 P)
+    (hU : StrictAntiOn U.deriv (Iio ∞)) (hX_meas : AEMeasurable X P) (hY_meas : AEMeasurable Y P) :
+    X =ᵐ[P] Y := by
+  -- Sum the first-order conditions of `X` against `Y` and of `Y` against `X`: the integrand
+  -- `U'(X) (Y - X) + U'(Y) (X - Y)` is nonnegative with nonpositive integral, hence zero, and
+  -- it is positive where `X ≠ Y`.
+  have h_int : ∫ᵉ ω, U.deriv (X ω) * (Y ω - X ω) + U.deriv (Y ω) * (X ω - Y ω) ∂P ≤ 0 := by
+    rw [eintegral_add' (by fun_prop) (by fun_prop)
+      (ne_top_of_le_ne_top (by simp) (hY.eintegral_deriv_mul_le hX.mem))
+      (hY.eintegral_deriv_mul_ne_bot hX.mem)]
+    exact add_nonpos (hX.eintegral_deriv_mul_le hY.mem) (hY.eintegral_deriv_mul_le hX.mem)
+  have h_top := hX.ae_deriv_mul_sub_ne_top hY.mem hX_meas hY_meas
+  have h_top' := hY.ae_deriv_mul_sub_ne_top hX.mem hY_meas hX_meas
+  have h_nonneg : ∀ᵐ ω ∂P, 0 ≤ U.deriv (X ω) * (Y ω - X ω) + U.deriv (Y ω) * (X ω - Y ω) := by
+    filter_upwards [hX.ae_deriv_mul_sub_ne_bot hY.mem hX_meas hY_meas, h_top, h_top']
+      with ω h1 h2 h3
+    exact U.deriv_mul_sub_add_deriv_mul_sub_nonneg h1 h2 h3
+  rw [eintegral_eq_lintegral_of_nonneg_ae h_nonneg] at h_int
+  have h_zero := le_antisymm h_int (EReal.coe_ennreal_nonneg _)
+  rw [EReal.coe_ennreal_eq_zero, lintegral_eq_zero_iff' (by fun_prop)] at h_zero
+  filter_upwards [h_zero, h_top, h_top'] with ω hω h2 h3
+  by_contra h_ne
+  rw [Pi.zero_apply, EReal.toENNReal_eq_zero_iff] at hω
+  exact (U.deriv_mul_sub_add_deriv_mul_sub_pos hU h_ne h2 h3).not_ge hω
+
+protected lemma smul (hX : IsNumeraireFor U X 𝓔 P) {c : ℝ≥0∞} (hc : c ≠ ∞) :
+    IsNumeraireFor U X 𝓔 (c • P) where
+  mem := hX.mem
+  eintegral_deriv_mul_ne_bot Y hY := by
+    rw [eintegral_smul_measure hc, EReal.mul_ne_bot]
+    exact ⟨.inl (by simp), .inr (hX.eintegral_deriv_mul_ne_bot hY), .inl (by simp [hc]),
+      .inl (by positivity)⟩
+  eintegral_deriv_mul_le Y hY := by
+    rw [eintegral_smul_measure hc]
+    exact EReal.mul_nonpos_iff.mpr (.inl ⟨by positivity, hX.eintegral_deriv_mul_le hY⟩)
+
+/-- The numeraire property transports along a measurable equivalence. -/
+lemma comp_measurableEquiv (e : 𝓧 ≃ᵐ 𝓨) {X : 𝓨 → ℝ≥0∞} {𝓔 : Set (𝓨 → ℝ≥0∞)}
+    (hX : IsNumeraireFor U X 𝓔 (P.map e)) :
+    IsNumeraireFor U (X ∘ e) ((· ∘ e) '' 𝓔) P where
+  mem := ⟨X, hX.mem, rfl⟩
+  eintegral_deriv_mul_ne_bot := by
+    rintro _ ⟨Y, hY, rfl⟩
+    simpa [eintegral_map_equiv] using hX.eintegral_deriv_mul_ne_bot hY
+  eintegral_deriv_mul_le := by
+    rintro _ ⟨Y, hY, rfl⟩
+    simpa [eintegral_map_equiv] using hX.eintegral_deriv_mul_le hY
+
+end IsNumeraireFor
+
+lemma isNumeraireFor_of_lintegral_deriv_mul_le (hX : X ∈ 𝓔)
+    (h𝓔 : ∀ ⦃Y⦄, Y ∈ 𝓔 → AEMeasurable Y P)
+    (h_ne_top : ∫⁻ ω, (U.deriv (X ω)).toENNReal * X ω ∂P ≠ ∞)
+    (h : ∀ ⦃Y⦄, Y ∈ 𝓔 →
+      ∫⁻ ω, (U.deriv (X ω)).toENNReal * Y ω ∂P ≤ ∫⁻ ω, (U.deriv (X ω)).toENNReal * X ω ∂P) :
+    IsNumeraireFor U X 𝓔 P where
+  mem := hX
+  eintegral_deriv_mul_ne_bot Y hY := by
+    rw [eintegral_deriv_mul_sub (h𝓔 hX) (h𝓔 hY) h_ne_top, sub_eq_add_neg, EReal.add_ne_bot_iff]
+    simpa using h_ne_top
+  eintegral_deriv_mul_le Y hY := by
+    rw [eintegral_deriv_mul_sub (h𝓔 hX) (h𝓔 hY) h_ne_top, EReal.sub_nonpos,
+      EReal.coe_ennreal_le_coe_ennreal_iff]
+    exact h hY
+
+/-- If `∫⁻ U'(X) X` is finite, `X` is a numeraire for `U` iff `X ∈ 𝓔` and
+`∫⁻ U'(X) Y ≤ ∫⁻ U'(X) X` for all `Y ∈ 𝓔`. -/
+lemma isNumeraireFor_iff (h𝓔 : ∀ ⦃Y⦄, Y ∈ 𝓔 → AEMeasurable Y P)
+    (h_ne_top : ∫⁻ ω, (U.deriv (X ω)).toENNReal * X ω ∂P ≠ ∞) :
+    IsNumeraireFor U X 𝓔 P ↔ X ∈ 𝓔 ∧ ∀ ⦃Y⦄, Y ∈ 𝓔 →
+      ∫⁻ ω, (U.deriv (X ω)).toENNReal * Y ω ∂P ≤ ∫⁻ ω, (U.deriv (X ω)).toENNReal * X ω ∂P :=
+  ⟨fun hX ↦ ⟨hX.mem, fun _ hY ↦ hX.lintegral_deriv_mul_le hY (h𝓔 hX.mem) (h𝓔 hY)⟩,
+    fun h ↦ isNumeraireFor_of_lintegral_deriv_mul_le h.1 h𝓔 h_ne_top h.2⟩
+
+/-- If `U'(∞) = 0`, an almost surely infinite element of `𝓔` is a numeraire. -/
+lemma isNumeraireFor_of_ae_eq_top (hU : U.deriv ∞ = 0) (hX : X ∈ 𝓔)
+    (hX_top : ∀ᵐ ω ∂P, X ω = ∞) :
+    IsNumeraireFor U X 𝓔 P := by
+  have h_zero (Y : 𝓧 → ℝ≥0∞) : ∫ᵉ ω, U.deriv (X ω) * (Y ω - X ω) ∂P = 0 := by
+    rw [← eintegral_zero P]
+    refine eintegral_congr_ae ?_
+    filter_upwards [hX_top] with ω hω
+    simp [hω, hU]
+  exact ⟨hX, fun Y _ ↦ by simp [h_zero Y], fun Y _ ↦ by simp [h_zero Y]⟩
+
+lemma isNumeraireFor_one_iff_isEVar (h𝓔 : IsEVarClass 𝓔) :
+    IsNumeraireFor U (1 : 𝓧 → ℝ≥0∞) 𝓔 P ↔
       U.deriv 1 = 0 ∨ ∀ Y ∈ 𝓔, IsEVar Y {P} := by
   have h_nonneg : 0 ≤ U.deriv 1 := Utility.deriv_nonneg U 1
   have h_ne_bot : U.deriv 1 ≠ ⊥ := EReal.ne_bot_of_nonneg h_nonneg
@@ -149,37 +347,50 @@ lemma isAbstractNumeraireFor_one_iff_isEVar (h𝓔 : IsEVarClass 𝓔) :
         or_false]
       exact h_le.eintegral_nonpos P (by simp)
 
-/-- A numeraire `X` maximizes the expected utility over the class `𝓔`. -/
-lemma eintegral_utility_le (hX : IsAbstractNumeraireFor U X 𝓔 P) (hY_mem : Y ∈ 𝓔)
-    (hX_meas : AEMeasurable X P) (hY_meas : AEMeasurable Y P) :
-    ∫ᵉ ω, U (Y ω) ∂P ≤ ∫ᵉ ω, U (X ω) ∂P := by
-  have h_foc := hX.eintegral_deriv_mul_le hY_mem
-  have h_ne_bot : ∫ᵉ ω, U.deriv (X ω) * (Y ω - X ω) ∂P ≠ ⊥ := hX.eintegral_deriv_mul_ne_bot hY_mem
-  have h_ne_top : ∫ᵉ ω, U.deriv (X ω) * (Y ω - X ω) ∂P ≠ ⊤ :=
-    ne_top_of_le_ne_top (by simp) h_foc
-  have h_meas : AEMeasurable (fun ω ↦ U.deriv (X ω) * ((Y ω : EReal) - X ω)) P := by fun_prop
-  calc ∫ᵉ ω, U (Y ω) ∂P
-  _ ≤ ∫ᵉ ω, U (X ω) + U.deriv (X ω) * (Y ω - X ω) ∂P := by
-    refine eintegral_mono_ae ?_
-    filter_upwards [ae_ne_bot_of_eintegral_ne_bot h_meas h_ne_bot,
-      ae_ne_top_of_eintegral_ne_top h_meas (eintegrable_of_eintegral_ne_bot h_ne_bot) h_ne_top]
-      with ω h_bot h_top
-    exact U.le_add_deriv_mul' h_bot h_top
-  _ = ∫ᵉ ω, U (X ω) ∂P + ∫ᵉ ω, U.deriv (X ω) * (Y ω - X ω) ∂P :=
-    eintegral_add' (by fun_prop) h_meas h_ne_top h_ne_bot
-  _ ≤ ∫ᵉ ω, U (X ω) ∂P := by grw [h_foc]; simp
+/-! ### Numeraire for the logarithmic utility -/
 
-end IsAbstractNumeraireFor
+/-- A numeraire for the logarithmic utility: `IsNumeraireFor` specialized to `logUtility`.
 
-structure IsAbstractNumeraire (X : 𝓧 → ℝ≥0∞) (𝓔 : Set (𝓧 → ℝ≥0∞)) (μ : Measure 𝓧) : Prop where
-  mem : X ∈ 𝓔
-  lintegral_div_le_measure_fsupport : ∀ ⦃Y⦄, Y ∈ 𝓔 → ∫⁻ ω, Y ω / X ω ∂μ ≤ μ X.fsupport
+If the elements of `𝓔` are measurable and the finite support of `X` has finite measure,
+this means that `X ∈ 𝓔` and `∫⁻ ω, Y ω / X ω ∂μ ≤ μ X.fsupport` for all `Y ∈ 𝓔`
+(see `isLogNumeraireFor_iff`). -/
+abbrev IsLogNumeraireFor (X : 𝓧 → ℝ≥0∞) (𝓔 : Set (𝓧 → ℝ≥0∞)) (μ : Measure 𝓧) : Prop :=
+  IsNumeraireFor logUtility X 𝓔 μ
 
-lemma lintegral_div_self_le_iff_IsAbstractNumeraire {P : Measure 𝓧} (h𝓔 : IsEVarClass 𝓔)
-    {Y : 𝓧 → ℝ≥0∞} (hY_evar : Y ∈ 𝓔) :
-    (∀ X, X ∈ 𝓔 → ∫⁻ ω, X ω / Y ω ∂P ≤ ∫⁻ ω, Y ω / Y ω ∂P) ↔ IsAbstractNumeraire Y 𝓔 P := by
-  simp_rw [lintegral_div_self_eq_measure_fsupport (h𝓔.measurable hY_evar)]
-  exact ⟨fun h ↦ ⟨hY_evar, h⟩, fun h ↦ h.lintegral_div_le_measure_fsupport⟩
+/-- A numeraire `X` for the logarithmic utility satisfies `∫⁻ Y / X ≤ P X.fsupport` for all
+`Y ∈ 𝓔`. This holds even if `P X.fsupport = ∞`, unlike the converse
+`isLogNumeraireFor_of_lintegral_div_le`. -/
+lemma IsLogNumeraireFor.lintegral_div_le_measure_fsupport (hX : IsLogNumeraireFor X 𝓔 P)
+    (hX_meas : AEMeasurable X P) (hY : Y ∈ 𝓔) (hY_meas : AEMeasurable Y P) :
+    ∫⁻ ω, Y ω / X ω ∂P ≤ P X.fsupport := by
+  simpa [toENNReal_deriv_logUtility, ← ENNReal.div_eq_inv_mul,
+    lintegral_div_self_eq_measure_fsupport hX_meas]
+    using hX.lintegral_deriv_mul_le hY hX_meas hY_meas
+
+lemma isLogNumeraireFor_of_lintegral_div_le (hX : X ∈ 𝓔)
+    (h𝓔 : ∀ ⦃Y⦄, Y ∈ 𝓔 → AEMeasurable Y P) (hX_fsupport : P X.fsupport ≠ ∞)
+    (h : ∀ ⦃Y⦄, Y ∈ 𝓔 → ∫⁻ ω, Y ω / X ω ∂P ≤ P X.fsupport) :
+    IsLogNumeraireFor X 𝓔 P := by
+  have h_eq (Y : 𝓧 → ℝ≥0∞) : ∫⁻ ω, (logUtility.deriv (X ω)).toENNReal * Y ω ∂P
+      = ∫⁻ ω, Y ω / X ω ∂P := by
+    simp [toENNReal_deriv_logUtility, ← ENNReal.div_eq_inv_mul]
+  refine isNumeraireFor_of_lintegral_deriv_mul_le hX h𝓔 ?_ fun Y hY ↦ ?_
+  · rwa [h_eq, lintegral_div_self_eq_measure_fsupport (h𝓔 hX)]
+  · rw [h_eq, h_eq, lintegral_div_self_eq_measure_fsupport (h𝓔 hX)]
+    exact h hY
+
+lemma isLogNumeraireFor_iff [IsFiniteMeasure P] (h𝓔 : ∀ ⦃Y⦄, Y ∈ 𝓔 → AEMeasurable Y P) :
+    IsLogNumeraireFor X 𝓔 P ↔ X ∈ 𝓔 ∧ ∀ ⦃Y⦄, Y ∈ 𝓔 → ∫⁻ ω, Y ω / X ω ∂P ≤ P X.fsupport :=
+  ⟨fun hX ↦ ⟨hX.mem, fun _ hY ↦ hX.lintegral_div_le_measure_fsupport (h𝓔 hX.mem) hY (h𝓔 hY)⟩,
+    fun h ↦ isLogNumeraireFor_of_lintegral_div_le h.1 h𝓔 (measure_ne_top _ _) h.2⟩
+
+lemma lintegral_div_self_le_iff_IsLogNumeraireFor [IsFiniteMeasure P] (h𝓔 : IsEVarClass 𝓔)
+    (hY_evar : Y ∈ 𝓔) :
+    (∀ X, X ∈ 𝓔 → ∫⁻ ω, X ω / Y ω ∂P ≤ ∫⁻ ω, Y ω / Y ω ∂P) ↔ IsLogNumeraireFor Y 𝓔 P := by
+  simp_rw [lintegral_div_self_eq_measure_fsupport (h𝓔.measurable hY_evar).aemeasurable,
+    isLogNumeraireFor_iff fun _ hY ↦ (h𝓔.measurable hY).aemeasurable, and_iff_right hY_evar]
+
+/-! ### Numeraire for a set of measures -/
 
 /-- A random variable `X` is the numeraire for a set of measures `S` and a measure `μ`
 if it is an e-variable for `S` and the expectation of the ratio of any e-variable `Y` over `X`
@@ -194,8 +405,15 @@ than the expectation of the ratio of `Y` over itself. -/
 lemma lintegral_div_self_le_iff_IsNumeraire {P : Measure 𝓧} {S : Set (Measure 𝓧)}
     {Y : 𝓧 → ℝ≥0∞} (hY_evar : IsEVar Y S) :
     (∀ X, IsEVar X S → ∫⁻ ω, X ω / Y ω ∂P ≤ ∫⁻ ω, Y ω / Y ω ∂P) ↔ IsNumeraire Y S P := by
-  simp_rw [lintegral_div_self_eq_measure_fsupport hY_evar.measurable]
+  simp_rw [lintegral_div_self_eq_measure_fsupport hY_evar.measurable.aemeasurable]
   exact ⟨fun h ↦ ⟨hY_evar, h⟩, fun h ↦ h.lintegral_div_le_measure_fsupport⟩
+
+/-- For a finite measure, a numeraire for `S` is a numeraire for the logarithmic utility in the
+class of e-variables for `S`. -/
+lemma isNumeraire_iff_isLogNumeraireFor [IsFiniteMeasure P] :
+    IsNumeraire X S P ↔ IsLogNumeraireFor X {Y | IsEVar Y S} P := by
+  rw [isLogNumeraireFor_iff fun Y hY ↦ hY.measurable.aemeasurable]
+  exact ⟨fun h ↦ ⟨h.toIsEVar, h.lintegral_div_le_measure_fsupport⟩, fun h ↦ ⟨h.1, h.2⟩⟩
 
 namespace IsNumeraire
 
@@ -291,52 +509,18 @@ lemma _root_.ProbabilityTheory.isNumeraire_of_isEmpty {f : 𝓧 → ℝ≥0∞}
     rw [lintegral_congr_ae this, lintegral_zero] at h
     simp_all
 
-set_option backward.isDefEq.respectTransparency false in
-lemma lintegral_eq_setLIntegral_fsupport [IsFiniteMeasure μ] (hX : IsNumeraire X S μ)
-    (hY : IsEVar Y S) : ∫⁻ ω, Y ω / X ω ∂μ = ∫⁻ ω in X.fsupport, Y ω / X ω ∂μ := by
-  rw [← lintegral_add_compl _ hX.measurable_fsupport]
-  suffices ∫⁻ ω in X.fsupportᶜ, Y ω / X ω ∂μ = 0 by simp [this]
-  rw [setLIntegral_eq_zero_iff]
-  rotate_left
-  · exact (hX.measurable_fsupport).compl
-  · exact hY.measurable.div hX.measurable
-  filter_upwards [hX.ae_ne_zero] with ω hω hω₂
-  simp only [Function.fsupport, ne_eq, mem_compl_iff, mem_inter_iff, mem_ofPred_eq, hω,
-    not_false_eq_true, and_true, Decidable.not_not] at hω₂
-  simp [hω₂]
+lemma isLogNumeraireFor [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) :
+    IsLogNumeraireFor X {Y | IsEVar Y S} μ :=
+  isNumeraire_iff_isLogNumeraireFor.mp hX
 
-/-- If an e-variable `Y` is ae-infinite at a point, then the numeraire `X` must also be
-ae-infinite. -/
-lemma ae_top_implies_numeraire_top [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) (hY : IsEVar Y S) :
-    ∀ᵐ ω ∂μ, Y ω = ∞ → X ω = ∞ := by
-  by_contra h
-  simp only [ae_iff, Classical.not_imp] at h
-  have m : MeasurableSet {ω | Y ω = ∞ ∧ X ω ≠ ∞} :=
-    MeasurableSet.inter ((measurableSet_singleton ∞).preimage hY.measurable)
-      ((measurableSet_singleton ∞).compl.preimage hX.measurable)
-  have lintegral_div_le_measure_fsupport := hX.lintegral_div_le_measure_fsupport hY
-  rw [← lintegral_add_compl _ m] at lintegral_div_le_measure_fsupport
-  suffices ∀ ω ∈ {ω | Y ω = ∞ ∧ X ω ≠ ∞}, Y ω / X ω = ∞ by
-    rw [setLIntegral_congr_fun m this] at lintegral_div_le_measure_fsupport
-    simp [ENNReal.top_mul h] at lintegral_div_le_measure_fsupport
-  intro ω hω
-  simp [hω.1, ENNReal.top_div, hω.2]
-
-lemma lintegral_eq_setLIntegral_fsupport' [IsFiniteMeasure μ] (hX : IsNumeraire X S μ)
-    (hY : IsEVar Y S) : ∫⁻ ω, Y ω / X ω ∂μ = ∫⁻ ω in Y.fsupport, Y ω / X ω ∂μ := by
-  rw [← lintegral_add_compl _ hY.measurable_fsupport]
-  suffices ∫⁻ ω in Y.fsupportᶜ, Y ω / X ω ∂μ = 0 by simp [this]
-  rw [setLIntegral_eq_zero_iff]
-  rotate_left
-  · exact (hY.measurable_fsupport).compl
-  · exact hY.measurable.div hX.measurable
-  filter_upwards [hX.ae_top_implies_numeraire_top hY] with ω hω hω₂
-  simp only [ENNReal.div_eq_zero_iff]
-  by_cases hω_top : Y ω = ∞
-  · simp [hω_top, hω hω_top]
-  · simp only [Function.fsupport, ne_eq, mem_compl_iff, mem_inter_iff, mem_ofPred_eq, not_and,
-      Decidable.not_not] at hω₂
-    simp [hω_top, hω₂]
+/-- If an e-variable `Y` is infinite at a point, then the numeraire `X` is also infinite there,
+almost surely. -/
+lemma ae_top_implies_numeraire_top [IsFiniteMeasure μ] (hX : IsNumeraire X S μ)
+    (hY : IsEVar Y S) :
+    ∀ᵐ ω ∂μ, Y ω = ∞ → X ω = ∞ :=
+  hX.isLogNumeraireFor.ae_eq_top_of_eq_top
+    (fun _ hx ↦ logUtility.deriv_pos_of_strictAntiOn strictAntiOn_deriv_logUtility hx) hY
+    hX.measurable.aemeasurable hY.measurable.aemeasurable
 
 lemma measure_fsupport_ne_zero_or_ae_top [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) :
     μ X.fsupport ≠ 0 ∨ X =ᵐ[μ] fun _ ↦ ∞ := by
@@ -348,126 +532,18 @@ lemma measure_fsupport_ne_zero_or_ae_top [IsFiniteMeasure μ] (hX : IsNumeraire 
   filter_upwards [h', ae_ne_zero hX] with ω hω_mem hω_ne_zero
   simpa [hω_ne_zero] using hω_mem
 
+/-- **Uniqueness Theorem**: The numeraire is almost-everywhere unique under finite measures. -/
+theorem ae_unique [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) (hY : IsNumeraire Y S μ) :
+    X =ᵐ[μ] Y :=
+  hX.isLogNumeraireFor.ae_unique hY.isLogNumeraireFor strictAntiOn_deriv_logUtility
+    hX.measurable.aemeasurable hY.measurable.aemeasurable
+
 /-- Two numeraires have equal finite support measures. -/
 lemma measure_fsupport_eq_measure_fsupport [IsFiniteMeasure μ] (hX : IsNumeraire X S μ)
     (hY : IsNumeraire Y S μ) : μ X.fsupport = μ Y.fsupport := by
   refine measure_congr ?_
-  filter_upwards [hX.ae_ne_zero, hY.ae_top_implies_numeraire_top hX.toIsEVar,
-      hY.ae_ne_zero, hX.ae_top_implies_numeraire_top hY.toIsEVar] with ω hXω₀ hωXY hYω₀ hωYX
-  rw [eq_iff_iff]
-  constructor
-  · rintro ⟨hXω_ne_top, _⟩
-    refine ⟨?_, hYω₀⟩
-    by_contra! h
-    simp only [ne_eq, mem_ofPred_eq, Decidable.not_not] at h
-    exact hXω_ne_top <| hωYX h
-  · rintro ⟨hYω_ne_top, _⟩
-    refine ⟨?_, hXω₀⟩
-    by_contra! h
-    simp only [ne_eq, mem_ofPred_eq, Decidable.not_not] at h
-    exact hYω_ne_top <| hωXY h
-
-lemma setLIntegral_fsupport_inv_le_measure [IsFiniteMeasure μ] (hX : IsNumeraire X S μ)
-    (hY : IsNumeraire Y S μ) : ∫⁻ ω in X.fsupport, (Y ω / X ω)⁻¹ ∂μ ≤ μ X.fsupport := by
-  suffices ∫⁻ ω in X.fsupport, ((Y / X) ω)⁻¹ ∂μ ≤ μ X.fsupport from this
-  rw [setLIntegral_congr_fun hX.measurable_fsupport <| ENNReal.inv_div_fsupport Y X,
-    ← hY.lintegral_eq_setLIntegral_fsupport' hX.toIsEVar]
-  rw [hX.measure_fsupport_eq_measure_fsupport hY]
-  exact hY.lintegral_div_le_measure_fsupport hX.toIsEVar
-
-lemma measure_fsupport_mul_inv_lintegral_div_eq_one [IsFiniteMeasure μ] (hX : IsNumeraire X S μ)
-    (hY : IsNumeraire Y S μ) (h : μ X.fsupport ≠ 0) :
-    (μ X.fsupport) * (∫⁻ ω in X.fsupport, Y ω / X ω ∂μ)⁻¹ = 1 := by
-  set W := Y / X
-  refine le_antisymm ?_ ?_
-  · calc
-    _ ≤ (μ X.fsupport)⁻¹ * ∫⁻ x in X.fsupport, (W x)⁻¹ ∂μ := by
-      refine Inv.map_set_lintegral_le hX.measurable_fsupport ?_ h ?_ ?_
-      · have := hX.measurable
-        have := hY.measurable
-        fun_prop
-      · simp
-      · filter_upwards [hX.ae_ne_zero, hX.ae_top_implies_numeraire_top hY.toIsEVar]
-          with ω hXω₀ hXYω hω
-        by_cases hY : Y ω = ⊤
-        · simp_all
-        · exact ENNReal.div_ne_top hY hXω₀
-    _ ≤ (μ X.fsupport)⁻¹ * μ X.fsupport := by
-      gcongr
-      exact setLIntegral_fsupport_inv_le_measure hX hY
-    _ = 1 := by
-      refine ENNReal.inv_mul_cancel h ?_
-      simp
-  · rw [← inv_inv (μ X.fsupport), ← ENNReal.mul_inv]
-    rotate_left
-    · left
-      simp
-    · left
-      simp [h]
-    · simp only [ENNReal.le_inv_iff_mul_le, one_mul]
-      calc
-      _ ≤ (μ X.fsupport)⁻¹ * μ X.fsupport := by
-        rw [← hX.lintegral_eq_setLIntegral_fsupport hY.toIsEVar]
-        gcongr
-        exact hX.lintegral_div_le_measure_fsupport hY.toIsEVar
-      _ = 1 := by
-        refine ENNReal.inv_mul_cancel h (by simp)
-
-lemma inv_measure_fsupport_mul_lintegral_div_eq_one [IsFiniteMeasure μ] (hX : IsNumeraire X S μ)
-    (hY : IsNumeraire Y S μ) (h : μ X.fsupport ≠ 0) :
-    (μ X.fsupport)⁻¹ * ∫⁻ ω in X.fsupport, Y ω / X ω ∂μ = 1 := by
-  rw [← inv_inv (∫⁻ ω in X.fsupport, Y ω / X ω ∂μ), ← ENNReal.mul_inv,
-    ← ENNReal.inv_eq_one, inv_inv]
-  · exact hX.measure_fsupport_mul_inv_lintegral_div_eq_one hY h
-  · exact .inl h
-  · left
-    simp
-
-/-- **Uniqueness Theorem**: The numeraire is almost-everywhere unique under finite measures. -/
-theorem ae_unique [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) (hY : IsNumeraire Y S μ) :
-    X =ᵐ[μ] Y := by
-  rcases hY.measure_fsupport_ne_zero_or_ae_top with μ_fsupport | hYₜ
-  swap
-  · filter_upwards [hYₜ, hX.ae_top_implies_numeraire_top hY.toIsEVar] with ω hω hω₂
-    simp_all
-  let W := X / Y
-  have h_str_cvx := Inv.ae_eq_const_or_map_set_lintegral_lt (f := W) (μ := μ)
-      (hY.measurable_fsupport) ?_ μ_fsupport ?_ ?_
-  rotate_left
-  · have := hX.measurable
-    have := hY.measurable
-    fun_prop
-  · simp
-  · filter_upwards [hY.ae_ne_zero, hY.ae_top_implies_numeraire_top hX.toIsEVar]
-      with ω hYω₀ hYXω hω
-    by_cases hX : X ω = ⊤
-    · simp_all
-    · exact ENNReal.div_ne_top hX hYω₀
-  simp only [Pi.div_apply, W] at h_str_cvx
-  rw [hY.measure_fsupport_mul_inv_lintegral_div_eq_one hX μ_fsupport] at h_str_cvx
-  rcases h_str_cvx with h_eq | h_lt
-  · rw [hY.inv_measure_fsupport_mul_lintegral_div_eq_one hX μ_fsupport] at h_eq
-    unfold Filter.EventuallyEq at h_eq ⊢
-    rw [ae_restrict_iff] at h_eq
-    · filter_upwards [h_eq, hX.ae_ne_zero, hY.ae_ne_zero,
-        hX.ae_top_implies_numeraire_top hY.toIsEVar] with ω hω_support hωY₀ hωX₀ hωXY
-      by_cases hω : ω ∈ Y.fsupport
-      · simp_all [ENNReal.eq_of_div_eq_one (hω_support hω)]
-      · rw [Function.not_mem_fsupport_iff] at hω
-        rcases hω with hω_top | hω_zero
-        · simp_all
-        · contradiction
-    · simp only [Pi.div_apply, Function.const_apply]
-      refine measurableSet_eq_fun ?_ measurable_const
-      have := hX.measurable
-      have := hY.measurable
-      fun_prop
-  · have : (μ Y.fsupport)⁻¹ * ∫⁻ x in Y.fsupport, (X x / Y x)⁻¹ ∂μ ≤ 1 := by
-      rw [← ENNReal.inv_mul_cancel μ_fsupport (by simp)]
-      gcongr
-      exact hY.setLIntegral_fsupport_inv_le_measure hX
-    have := h_lt.trans_le this
-    simp_all
+  filter_upwards [hX.ae_unique hY] with ω hω
+  simp [hω]
 
 lemma congr (hX : IsNumeraire X S μ) (hY_evar : IsEVar Y S) (hY : Y =ᵐ[μ] X) :
     IsNumeraire Y S μ := by
@@ -525,18 +601,6 @@ theorem eintegral_log_div_nonpos' [IsFiniteMeasure μ]
   rw [cond, Measure.restrict_univ]
   exact hX.smul _
 
-lemma eintegral_eq_setEIntegral_of_eq_zero {f : 𝓧 → EReal}
-    {s : Set 𝓧} (hs : MeasurableSet s) (h_zero : ∀ᵐ ω ∂μ, ω ∈ sᶜ → f ω = 0) :
-    ∫ᵉ ω, f ω ∂μ = ∫ᵉ ω in s, f ω ∂μ := by
-  unfold eintegral
-  simp_rw [← lintegral_indicator hs]
-  congr 2 <;>
-  · refine lintegral_congr_ae ?_
-    filter_upwards [h_zero] with ω hω
-    by_cases hωs : ω ∈ s
-    · simp [hωs]
-    · simp [hω hωs, hωs]
-
 lemma eintegral_div_le_measure_univ [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) (hY : IsEVar Y S) :
     ∫ᵉ ω, Y ω / X ω ∂μ ≤ μ univ := by
   rw [eintegral_eq_lintegral_of_nonneg (fun _ ↦ by positivity)]
@@ -550,164 +614,30 @@ lemma eintegral_div_le_one [IsProbabilityMeasure μ] (hX : IsNumeraire X S μ) (
     ∫ᵉ ω, Y ω / X ω ∂μ ≤ 1 := by
   simpa using eintegral_div_le_measure_univ hX hY
 
-lemma setEIntegral_le_eintegral_of_nonneg {f : 𝓧 → EReal} (hf_nonneg : ∀ ω, 0 ≤ f ω) (s : Set 𝓧) :
-    ∫ᵉ ω in s, f ω ∂μ ≤ ∫ᵉ ω, f ω ∂μ := by
-  rw [eintegral_eq_lintegral_of_nonneg hf_nonneg, eintegral_eq_lintegral_of_nonneg]
-  · norm_cast
-    exact setLIntegral_le_lintegral s fun x ↦ (f x).toENNReal
-  · exact hf_nonneg
+/-- The first-order optimality condition of the numeraire for the logarithmic utility. -/
+lemma eintegral_sub_div_nonpos [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) (hY : IsEVar Y S) :
+    ∫ᵉ ω, (Y ω - X ω) / X ω ∂μ ≤ 0 := by
+  refine le_trans (eintegral_mono fun ω ↦ ?_) (hX.isLogNumeraireFor.eintegral_deriv_mul_le hY)
+  rw [deriv_logUtility_eq_ennreal]
+  rcases eq_or_ne (X ω) 0 with h0 | h0
+  · simp only [h0, EReal.coe_ennreal_zero, sub_zero, ENNReal.div_zero one_ne_zero,
+      EReal.coe_ennreal_top, EReal.div_zero]
+    exact EReal.mul_nonneg (by simp) (EReal.coe_ennreal_nonneg _)
+  · rw [div_eq_mul_inv, mul_comm, EReal.inv_coe_ennreal h0, one_div]
 
-lemma setEIntegral_le_eintegral_of_ae_nonneg {f : 𝓧 → EReal} (hf_nonneg : ∀ᵐ ω ∂μ, 0 ≤ f ω)
-    (s : Set 𝓧) :
-    ∫ᵉ ω in s, f ω ∂μ ≤ ∫ᵉ ω, f ω ∂μ := by
-  rw [eintegral_eq_lintegral_of_nonneg_ae hf_nonneg,
-    eintegral_eq_lintegral_of_nonneg_ae (ae_restrict_of_ae hf_nonneg)]
-  norm_cast
-  exact setLIntegral_le_lintegral s fun x ↦ (f x).toENNReal
+/-- A Numeraire maximizes the integral of the logarithm. -/
+theorem eintegral_log_le [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) (hY : IsEVar Y S) :
+    ∫ᵉ ω, ENNReal.log (Y ω) ∂μ ≤ ∫ᵉ ω, ENNReal.log (X ω) ∂μ :=
+  hX.isLogNumeraireFor.eintegral_utility_le hY hX.measurable.aemeasurable
+    hY.measurable.aemeasurable
 
--- todo: it should really be ≤ 0 instead, but this weaker result will be useful to prove that a
--- numeraire is `eintegrable`
-lemma eintegral_sub_div_le_measure_univ [IsFiniteMeasure μ]
-    (hX : IsNumeraire X S μ) (hY : IsEVar Y S) :
-    ∫ᵉ ω, (Y ω - X ω) / X ω ∂μ ≤ μ univ := by
-  have h_eq : ∀ᵐ ω ∂μ, X ω ≠ ⊤ → ((Y ω : EReal) - X ω) / X ω = Y ω / X ω - 1 := by
-    filter_upwards [hX.ae_ne_zero, ae_top_implies_numeraire_top hX hY] with ω hX0 h_imp_top hX_top
-    have hY_top : Y ω ≠ ∞ := fun h_false ↦ hX_top <| h_imp_top h_false
-    have hX_eq : (X ω : EReal) = (X ω).toReal := by rw [EReal.coe_ennreal_toReal hX_top]
-    have hY_eq : (Y ω : EReal) = (Y ω).toReal := by rw [EReal.coe_ennreal_toReal hY_top]
-    rw [hX_eq, hY_eq]
-    norm_cast
-    rw [← EReal.coe_div, ← EReal.coe_div]
-    have hX_ne_zero : (X ω).toReal ≠ 0 := by simp [ENNReal.toReal_eq_zero_iff, hX0, hX_top]
-    simp [sub_div, div_self hX_ne_zero]
-  have h_int_restrict : ∫ᵉ ω, (Y ω - X ω) / X ω ∂μ
-      = ∫ᵉ ω in {ω | X ω ≠ ⊤}, (Y ω - X ω) / X ω ∂μ := by
-    refine eintegral_eq_setEIntegral_of_eq_zero ?_ ?_
-    · exact ((measurableSet_singleton _).preimage hX.measurable).compl
-    · filter_upwards [] with ω hω_top
-      simp only [ne_eq, mem_compl_iff, mem_ofPred_eq, Decidable.not_not] at hω_top
-      simp [hω_top]
-  have h_int_restrict' : ∫ᵉ ω, Y ω / X ω ∂μ = ∫ᵉ ω in {ω | X ω ≠ ⊤}, Y ω / X ω ∂μ := by
-    refine eintegral_eq_setEIntegral_of_eq_zero ?_ ?_
-    · exact ((measurableSet_singleton _).preimage hX.measurable).compl
-    · filter_upwards [] with ω hω_top
-      simp only [ne_eq, mem_compl_iff, mem_ofPred_eq, Decidable.not_not] at hω_top
-      simp [hω_top]
-  rw [h_int_restrict]
-  calc ∫ᵉ ω in {ω | X ω ≠ ⊤}, (Y ω - X ω) / X ω ∂μ
-  _ = ∫ᵉ ω in {ω | X ω ≠ ⊤}, Y ω / X ω - 1 ∂μ := by
-    refine eintegral_congr_ae ?_
-    rwa [ae_restrict_iff']
-    exact ((measurableSet_singleton _).preimage hX.measurable).compl
-  _ ≤ ∫ᵉ ω in {ω | X ω ≠ ⊤}, Y ω / X ω ∂μ := by
-    gcongr with ω
-    rw [sub_eq_add_neg]
-    conv_rhs => rw [← add_zero ((Y ω : EReal) / X ω)]
-    gcongr
-    simp
-  _ ≤ ∫ᵉ ω, Y ω / X ω ∂μ := by
-    refine setEIntegral_le_eintegral_of_nonneg (fun _ ↦ ?_) _
-    positivity
-  _ ≤ μ univ := hX.eintegral_div_le_measure_univ hY
-
--- todo: it should really be ≤ 0 instead, but this weaker result will be useful to prove that a
--- numeraire is `eintegrable`
-lemma eintegral_sub_div_le_one [IsProbabilityMeasure μ]
-    (hX : IsNumeraire X S μ) (hY : IsEVar Y S) :
-    ∫ᵉ ω, (Y ω - X ω) / X ω ∂μ ≤ 1 := by
-  simpa using eintegral_sub_div_le_measure_univ hX hY
-
-theorem eintegral_log_ge_neg_measure_univ [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) :
-    - μ univ ≤ ∫ᵉ ω, ENNReal.log (X ω) ∂μ := by
-  have hX_meas := hX.measurable
-  have hY : IsEVar (fun _ ↦ 1) S := isEVar_one S
-  suffices 0 ≤ ∫ᵉ ω, ENNReal.log (X ω) ∂μ + μ univ by
-    conv_lhs => rw [← zero_add (- (μ univ : EReal)), ← sub_eq_add_neg]
-    rwa [EReal.sub_le_iff_le_add]
-    · left; simp
-    · left; simp
-  calc 0
-  _ = ∫ᵉ ω, ENNReal.log 1 ∂μ := by simp
-  _ ≤ ∫ᵉ ω, ENNReal.log (X ω) + (1 - X ω) * (if X ω = 0 then ⊤ else 1 / X ω) ∂μ := by
-    refine eintegral_mono_ae ?_
-    filter_upwards [hX.ae_ne_zero] with ω hω
-    by_cases hX_top : X ω = ∞
-    · simp [hX_top]
-    simp only [ENNReal.log_one, hω, ↓reduceIte, one_div]
-    have : X ω = ENNReal.ofReal (X ω).toReal := by rw [ENNReal.ofReal_toReal hX_top]
-    have h_pos : 0 < (X ω).toReal := ENNReal.toReal_pos hω hX_top
-    rw [this, ENNReal.log_ofReal, EReal.coe_ennreal_ofReal, EReal.coe_ennreal_inv,
-      EReal.coe_ennreal_ofReal, ← EReal.coe_inv]
-    swap; · rwa [ENNReal.ofReal_toReal hX_top]
-    simp only [not_le.mpr h_pos, ↓reduceIte, ENNReal.toReal_nonneg, sup_of_le_left, ge_iff_le]
-    norm_cast
-    have h := Real.one_sub_inv_le_log_of_pos h_pos
-    field_simp at h ⊢
-    linarith
-  _ = ∫ᵉ ω, ENNReal.log (X ω) + (1 - X ω) / X ω ∂μ := by
-    refine eintegral_congr_ae ?_
-    filter_upwards [hX.ae_ne_zero] with ω hω
-    congr
-    simp only [hω, ↓reduceIte, one_div]
-    rw [← EReal.inv_coe_ennreal hω]
-    rfl
-  _ = ∫ᵉ ω, ENNReal.log (X ω) ∂μ + ∫ᵉ ω, (1 - X ω) / X ω ∂μ := by
-    rw [eintegral_add']
-    · fun_prop
-    · fun_prop
-    · refine ne_top_of_le_ne_top (by simp : (μ univ : EReal) ≠ ⊤) ?_
-      calc ∫ᵉ ω, (1 - X ω) / X ω ∂μ
-      _ ≤ ∫ᵉ ω, 1 / X ω ∂μ := by
-        refine eintegral_mono fun ω ↦ ?_
-        gcongr
-        rw [sub_eq_add_neg]
-        conv_rhs => rw [← add_zero 1]
-        gcongr
-        simp only [EReal.neg_le_zero]
-        positivity
-      _ = ∫⁻ ω, 1 / X ω ∂μ := by
-        rw [eintegral_eq_lintegral_of_nonneg]
-        · congr 1
-          refine lintegral_congr_ae ?_
-          filter_upwards [hX.ae_ne_zero] with ω hω
-          rw [div_eq_mul_inv, EReal.toENNReal_mul, EReal.toENNReal_one, EReal.toENNReal_inv,
-            EReal.toENNReal_coe, div_eq_mul_inv]
-          · positivity
-          · positivity
-        · intro x
-          positivity
-      _ ≤ μ univ := mod_cast hX.lintegral_div_le_measure_univ hY
-    · refine ne_bot_of_le_ne_bot (by simp : (- (μ univ : EReal)) ≠ ⊥) ?_
-      calc - (μ univ : EReal)
-      _ = ∫ᵉ ω, - 1 ∂μ := by simp
-      _ ≤ ∫ᵉ ω, - X ω / X ω ∂μ := by
-        gcongr with ω
-        by_cases hX0 : X ω = 0
-        · simp [hX0]
-        by_cases hX_top : X ω = ∞
-        · simp [hX_top]
-        rw [EReal.neg_div, EReal.div_self (by simp) (by simp [hX_top]) (by simp [hX0])]
-      _ ≤ ∫ᵉ ω, (1 - X ω) / X ω ∂μ := by
-        gcongr with ω
-        rw [sub_eq_add_neg]
-        conv_lhs => rw [← zero_add (- (X ω : EReal))]
-        gcongr
-        simp
-  _ ≤ ∫ᵉ ω, ENNReal.log (X ω) ∂μ + μ univ := by
-    gcongr
-    convert hX.eintegral_sub_div_le_measure_univ hY
-    rfl
-
-theorem eintegral_log_ge_neg_one [IsProbabilityMeasure μ] (hX : IsNumeraire X S μ) :
-    -1 ≤ ∫ᵉ ω, ENNReal.log (X ω) ∂μ := by
-  simpa using eintegral_log_ge_neg_measure_univ hX
+lemma eintegral_log_nonneg [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) :
+    0 ≤ ∫ᵉ ω, ENNReal.log (X ω) ∂μ := by
+  simpa using eintegral_log_le hX (isEVar_one S)
 
 lemma eintegral_log_ne_bot [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) :
-    ∫ᵉ ω, ENNReal.log (X ω) ∂μ ≠ ⊥ := by
-  have h_le := eintegral_log_ge_neg_measure_univ hX
-  by_contra h
-  simp only [h, le_bot_iff, EReal.neg_eq_bot_iff] at h_le
-  simp at h_le
+    ∫ᵉ ω, ENNReal.log (X ω) ∂μ ≠ ⊥ :=
+  ne_bot_of_le_ne_bot (by simp) hX.eintegral_log_nonneg
 
 /-- The logarithm of the numeraire is integrable. -/
 protected lemma eintegrable_log [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) :
@@ -716,23 +646,13 @@ protected lemma eintegrable_log [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) :
   refine hX.eintegral_log_ne_bot ?_
   exact eintegral_of_not_eintegrable h_false
 
-/-- A Numeraire maximizes the integral of the logarithm. -/
-theorem eintegral_log_le [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) (hY : IsEVar Y S) :
-    ∫ᵉ ω, ENNReal.log (Y ω) ∂μ ≤ ∫ᵉ ω, ENNReal.log (X ω) ∂μ := by
-  by_cases hY_bot : ∫ᵉ ω, ENNReal.log (Y ω) ∂μ = ⊥
-  · simp [hY_bot]
-  by_cases hX_top : ∫ᵉ ω, ENNReal.log (X ω) ∂μ = ⊤
-  · simp [hX_top]
-  have h_nonpos := eintegral_log_div_nonpos' hX hY
-  simp_rw [ENNReal.log_div] at h_nonpos
-  rwa [eintegral_sub (by have := hY.measurable; fun_prop) (by have := hX.measurable; fun_prop)
-    hX.eintegrable_log, EReal.sub_nonpos] at h_nonpos
-  · simp [hX_top]
-  · simp [hY_bot]
+theorem eintegral_log_ge_neg_measure_univ [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) :
+    - μ univ ≤ ∫ᵉ ω, ENNReal.log (X ω) ∂μ :=
+  le_trans (by simpa using EReal.coe_ennreal_nonneg _) hX.eintegral_log_nonneg
 
-lemma eintegral_log_nonneg [IsFiniteMeasure μ] (hX : IsNumeraire X S μ) :
-    0 ≤ ∫ᵉ ω, ENNReal.log (X ω) ∂μ := by
-  simpa using eintegral_log_le hX (isEVar_one S)
+theorem eintegral_log_ge_neg_one [IsProbabilityMeasure μ] (hX : IsNumeraire X S μ) :
+    -1 ≤ ∫ᵉ ω, ENNReal.log (X ω) ∂μ := by
+  simpa using eintegral_log_ge_neg_measure_univ hX
 
 end LogOptimal
 

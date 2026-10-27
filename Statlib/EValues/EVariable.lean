@@ -223,6 +223,10 @@ lemma _root_.Measurable.measurable_fsupport (hX : Measurable X) :
   suffices MeasurableSet {ω | X ω ≠ ⊤} ∧ MeasurableSet {ω | X ω ≠ 0} from this.1.inter this.2
   constructor <;> exact ((measurableSet_singleton _).preimage hX).compl
 
+lemma _root_.AEMeasurable.nullMeasurableSet_fsupport {μ : Measure 𝓧} (hX : AEMeasurable X μ) :
+    NullMeasurableSet X.fsupport μ :=
+  hX.nullMeasurable ((measurableSet_singleton ⊤).compl.inter (measurableSet_singleton 0).compl)
+
 lemma IsEVar.measurable_fsupport (hX : IsEVar X S) :
     MeasurableSet X.fsupport := hX.measurable.measurable_fsupport
 

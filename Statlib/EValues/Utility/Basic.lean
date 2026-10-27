@@ -31,6 +31,9 @@ This file defines utility functions for use in probability theory and e-value th
   Taylor approximation (a consequence of concavity).
 * `Utility.antitone_deriv`, `Utility.continuous_deriv`: the derivative of a utility function is
   antitone and continuous on all of `ℝ≥0∞`, including at `0` and at `∞`.
+* `Utility.deriv_mul_sub_add_deriv_mul_sub_nonneg`, `Utility.deriv_mul_sub_add_deriv_mul_sub_pos`:
+  monotonicity of the derivative in the form `U'(x) (y - x) + U'(y) (x - y) ≥ 0`, strict for
+  strictly concave utilities.
 * `Utility.deriv_mul_sub_le_liminf`: the difference quotients of a utility function along a
   segment are eventually at least the directional derivative.
 
@@ -323,6 +326,104 @@ lemma Utility.antitone_deriv (U : Utility) : Antitone U.deriv := by
   rw [U.deriv_eq_coe hx0 hx_top, U.deriv_eq_coe hy0 hy_top]
   exact_mod_cast U.antitoneOn_deriv_real (ENNReal.toReal_pos hx0 hx_top)
     (ENNReal.toReal_pos hy0 hy_top) (ENNReal.toReal_mono hy_top hxy)
+
+/-- The derivative of a utility function is finite away from `0`. -/
+lemma Utility.deriv_ne_top (U : Utility) {x : ℝ≥0∞} (hx0 : x ≠ 0) : U.deriv x ≠ ⊤ := by
+  rcases eq_or_ne x ∞ with rfl | hx_top
+  · refine ne_top_of_le_ne_top ?_ (U.deriv_top_le one_ne_zero)
+    rw [U.deriv_eq_coe one_ne_zero ENNReal.one_ne_top]
+    exact EReal.coe_ne_top _
+  · rw [U.deriv_eq_coe hx0 hx_top]
+    exact EReal.coe_ne_top _
+
+/-- The first-order term `U'(x) (y - x)` is the difference of the two `ℝ≥0∞`-valued terms
+`U'(x) y` and `U'(x) x`. -/
+lemma Utility.deriv_mul_sub_eq (U : Utility) (x y : ℝ≥0∞) :
+    U.deriv x * ((y : EReal) - x)
+      = (((U.deriv x).toENNReal * y : ℝ≥0∞) : EReal) - ((U.deriv x).toENNReal * x : ℝ≥0∞) := by
+  have hd : ((U.deriv x).toENNReal : EReal) = U.deriv x := EReal.coe_toENNReal (U.deriv_nonneg x)
+  rcases eq_or_ne x 0 with rfl | hx0
+  · simp [EReal.coe_ennreal_mul, hd]
+  rw [EReal.coe_ennreal_mul, EReal.coe_ennreal_mul, hd,
+    EReal.mul_sub_of_nonneg_of_ne_top (U.deriv_nonneg x) (U.deriv_ne_top hx0)]
+
+/-- If the derivative of `U` is strictly antitone on `[0, ∞)` (that is, if `U` is strictly
+concave), then it is strictly antitone on `[0, ∞]`. -/
+lemma Utility.deriv_lt_deriv_of_strictAntiOn (U : Utility) (hU : StrictAntiOn U.deriv (Set.Iio ∞))
+    {x y : ℝ≥0∞} (hxy : x < y) : U.deriv y < U.deriv x := by
+  obtain ⟨z, hxz, hzy⟩ := exists_between hxy
+  exact (U.antitone_deriv hzy.le).trans_lt
+    (hU (hxy.trans_le le_top) (hzy.trans_le le_top) hxz)
+
+lemma Utility.deriv_pos_of_strictAntiOn (U : Utility) (hU : StrictAntiOn U.deriv (Set.Iio ∞))
+    {x : ℝ≥0∞} (hx : x ≠ ∞) : 0 < U.deriv x :=
+  (U.deriv_nonneg ∞).trans_lt (U.deriv_lt_deriv_of_strictAntiOn hU hx.lt_top)
+
+/-- Monotonicity of the derivative of a utility function, in the form
+`U'(x) (y - x) + U'(y) (x - y) ≥ 0` for `x < y`, with a strict inequality if `U'(y) < U'(x)`. -/
+lemma Utility.deriv_mul_sub_add_deriv_mul_sub_of_lt (U : Utility) {x y : ℝ≥0∞} (hxy : x < y)
+    (h_top : U.deriv x * ((y : EReal) - x) ≠ ⊤) :
+    0 ≤ U.deriv x * ((y : EReal) - x) + U.deriv y * ((x : EReal) - y) ∧
+      (U.deriv y < U.deriv x →
+        0 < U.deriv x * ((y : EReal) - x) + U.deriv y * ((x : EReal) - y)) := by
+  have hx_top : x ≠ ∞ := hxy.ne_top
+  have h_anti : U.deriv y ≤ U.deriv x := U.antitone_deriv hxy.le
+  rcases eq_or_ne y ∞ with rfl | hy_top
+  · -- `U'(x) (∞ - x)` is finite only if `U'(x) = 0`, and then `U'(∞) = 0`.
+    have hdx : U.deriv x = 0 := by
+      refine le_antisymm (not_lt.mp fun h_pos ↦ h_top ?_) (U.deriv_nonneg x)
+      rw [EReal.coe_ennreal_top, EReal.top_sub (by simpa using hx_top), EReal.mul_top_of_pos h_pos]
+    have hdy : U.deriv ∞ = 0 := le_antisymm (hdx ▸ h_anti) (U.deriv_nonneg ∞)
+    simp [hdx, hdy]
+  lift x to ℝ≥0 using hx_top
+  lift y to ℝ≥0 using hy_top
+  have hxy' : (x : ℝ) < y := mod_cast hxy
+  have h_sub (a b : ℝ≥0) :
+      ((a : ℝ≥0∞) : EReal) - ((b : ℝ≥0∞) : EReal) = ((a - b : ℝ) : EReal) := by
+    simp [EReal.coe_nnreal_eq_coe_real, EReal.coe_sub]
+  simp only [h_sub] at h_top ⊢
+  have hdx_top : U.deriv x ≠ ⊤ := by
+    intro h
+    rw [h, EReal.top_mul_coe_of_pos (by linarith)] at h_top
+    exact h_top rfl
+  have hdy_nonneg := U.deriv_nonneg y
+  lift U.deriv x to ℝ using ⟨hdx_top, EReal.ne_bot_of_nonneg (U.deriv_nonneg _)⟩ with a
+  lift U.deriv y to ℝ using ⟨ne_top_of_le_ne_top (EReal.coe_ne_top a) h_anti,
+    EReal.ne_bot_of_nonneg hdy_nonneg⟩ with b
+  norm_cast at h_anti hdy_nonneg ⊢
+  exact ⟨by nlinarith, fun hba ↦ by nlinarith⟩
+
+/-- Monotonicity of the derivative of a utility function:
+`U'(x) (y - x) + U'(y) (x - y) ≥ 0`, provided that neither term is `⊤` and the first is not `⊥`
+(which excludes the indeterminate cases at `∞`). -/
+lemma Utility.deriv_mul_sub_add_deriv_mul_sub_nonneg (U : Utility) {x y : ℝ≥0∞}
+    (h_bot : U.deriv x * ((y : EReal) - x) ≠ ⊥)
+    (h_top : U.deriv x * ((y : EReal) - x) ≠ ⊤) (h_top' : U.deriv y * ((x : EReal) - y) ≠ ⊤) :
+    0 ≤ U.deriv x * ((y : EReal) - x) + U.deriv y * ((x : EReal) - y) := by
+  rcases lt_trichotomy x y with hxy | rfl | hxy
+  · exact (U.deriv_mul_sub_add_deriv_mul_sub_of_lt hxy h_top).1
+  · suffices 0 ≤ U.deriv x * ((x : EReal) - x) from add_nonneg this this
+    rcases eq_or_ne x ∞ with rfl | hx_top
+    · rcases (U.deriv_nonneg ∞).eq_or_lt with h | h
+      · simp [← h]
+      · simp [EReal.mul_bot_of_pos h] at h_bot
+    · rw [EReal.sub_self (by simpa using hx_top) (by simp)]
+      simp
+  · rw [add_comm]
+    exact (U.deriv_mul_sub_add_deriv_mul_sub_of_lt hxy h_top').1
+
+/-- Strict monotonicity of the derivative of a strictly concave utility function:
+`U'(x) (y - x) + U'(y) (x - y) > 0` for `x ≠ y`, provided that neither term is `⊤`. -/
+lemma Utility.deriv_mul_sub_add_deriv_mul_sub_pos (U : Utility)
+    (hU : StrictAntiOn U.deriv (Set.Iio ∞)) {x y : ℝ≥0∞} (hxy : x ≠ y)
+    (h_top : U.deriv x * ((y : EReal) - x) ≠ ⊤) (h_top' : U.deriv y * ((x : EReal) - y) ≠ ⊤) :
+    0 < U.deriv x * ((y : EReal) - x) + U.deriv y * ((x : EReal) - y) := by
+  rcases hxy.lt_or_gt with hxy | hxy
+  · exact (U.deriv_mul_sub_add_deriv_mul_sub_of_lt hxy h_top).2
+      (U.deriv_lt_deriv_of_strictAntiOn hU hxy)
+  · rw [add_comm]
+    exact (U.deriv_mul_sub_add_deriv_mul_sub_of_lt hxy h_top').2
+      (U.deriv_lt_deriv_of_strictAntiOn hU hxy)
 
 /-- If the derivative of `U` at `0` is finite, then `U 0` is finite. -/
 lemma Utility.ne_bot_of_deriv_zero_ne_top (U : Utility) (h_deriv : U.deriv 0 ≠ ⊤) :
