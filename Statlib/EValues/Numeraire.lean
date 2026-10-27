@@ -435,6 +435,11 @@ lemma isNumeraire_one (hPS : P ∈ S) : IsNumeraire 1 S P where
   eintegral_deriv_mul_le Y hY := by
     simpa [deriv_logUtility_eq_ennreal] using hY.eintegral_nonpos P hPS
 
+/-- The maximum log utility of a measure of `S` is zero. -/
+lemma maxUtility_eq_zero_of_mem (hPS : P ∈ S) : maxUtility P S logUtility = 0 := by
+  rw [(isNumeraire_one hPS).maxUtility_eq_eintegral]
+  simp [logUtility]
+
 /-- If `S` is empty, every measurable function is an e-variable, and an almost everywhere
 infinite function is a numeraire. -/
 lemma isNumeraire_of_isEmpty (hS : IsEmpty S) (hX : Measurable X) (hX_top : ∀ᵐ x ∂P, X x = ∞) :

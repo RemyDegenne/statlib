@@ -548,4 +548,11 @@ lemma eintegral_dirac [MeasurableSingletonClass α] (x₀ : α) (f : α → ERea
   simp only [eintegral, lintegral_dirac]
   rcases le_total (f x₀) 0 with (h | h) <;> simp [h]
 
+/-- Version of `eintegral_dirac` for a measurable function, without `MeasurableSingletonClass`. -/
+lemma eintegral_dirac' (x₀ : α) {f : α → EReal} (hf : Measurable f) :
+    ∫ᵉ x, f x ∂(Measure.dirac x₀) = f x₀ := by
+  simp only [eintegral, lintegral_dirac' _ (by fun_prop : Measurable fun x ↦ (f x).toENNReal),
+    lintegral_dirac' _ (by fun_prop : Measurable fun x ↦ (-f x).toENNReal)]
+  rcases le_total (f x₀) 0 with (h | h) <;> simp [h]
+
 end MeasureTheory
