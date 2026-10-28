@@ -12,6 +12,7 @@ public import Mathlib.Probability.Notation
 public import Statlib.EValues.NumeraireExistence
 public import Statlib.ForMathlib.MeasureTheory.Integral.EReal.Bochner
 public import Statlib.ForMathlib.MeasureTheory.Measure.LogLikelihoodRatio
+public import Statlib.ForMathlib.InformationTheory.KullbackLeibler.EIntegral
 
 /-!
 # Reverse information projection and duality
@@ -40,6 +41,8 @@ over the effective set.
 * `maxUtility_eq_iInf_klIntegral_effectiveSet`:
   `maxUtility P S logUtility = ⨅ μ ∈ effectiveSet S, klIntegral P μ`. This is the duality between
   maximal logarithmic utility and minimal Kullback-Leibler divergence.
+* `maxUtility_singleton_eq_klDiv`: for probability measures,
+  `maxUtility P {Q} logUtility = klDiv P Q`.
 
 ## References
 
@@ -324,5 +327,52 @@ lemma maxUtility_eq_iInf_klIntegral_effectiveSet [IsProbabilityMeasure P]
   le_antisymm (le_iInf₂ fun _ ↦ maxUtility_le_klIntegral_of_mem_effectiveSet hS)
     ((iInf₂_le (ripr P S) (ripr_mem_effectiveSet P hS)).trans_eq
       (maxUtility_eq_klIntegral_ripr hS).symm)
+
+/-- For probability measures, the maximal logarithmic utility of the e-variables for `{Q}` under
+`P` is the Kullback-Leibler divergence `klDiv P Q`. `Q` belongs to the effective set of `{Q}`, which
+gives the upper bound by duality. If `P ≪ Q`, the likelihood ratio `∂P/∂Q` is an e-variable
+attaining it; otherwise an e-variable equal to `∞` on a `Q`-null set charged by `P` has infinite
+expected logarithm. -/
+theorem maxUtility_singleton_eq_klDiv (P Q : Measure 𝓧) [IsProbabilityMeasure P]
+    [IsProbabilityMeasure Q] :
+    maxUtility P {Q} logUtility = klDiv P Q := by
+  have hQ : ∀ μ ∈ ({Q} : Set (Measure 𝓧)), IsProbabilityMeasure μ := by
+    rintro μ rfl
+    infer_instance
+  refine le_antisymm ?_ ?_
+  · rw [← klIntegral_eq_klDiv (by simp)]
+    refine maxUtility_le_klIntegral_of_mem_effectiveSet
+      (fun μ hμ ↦ have := hQ μ hμ; inferInstance) fun X hX ↦ ?_
+    simpa using hX.lintegral_le_measure_univ Q rfl
+  by_cases h_ac : P ≪ Q
+  · -- the likelihood ratio `∂P/∂Q` is an e-variable for `{Q}`
+    have hX : IsEVar (P.rnDeriv Q) {Q} := .of_lintegral_le_one hQ (by fun_prop) fun μ hμ ↦ by
+      obtain rfl : μ = Q := hμ
+      exact Measure.lintegral_rnDeriv_le.trans_eq measure_univ
+    refine le_of_eq_of_le ?_ (hX.eintegral_le_maxUtility P logUtility)
+    rw [coe_klDiv_eq_eintegral_llr_of_measure_eq h_ac (by simp)]
+    refine eintegral_congr_ae ?_
+    filter_upwards [Measure.rnDeriv_pos h_ac, h_ac.ae_le (Measure.rnDeriv_lt_top P Q)]
+      with x h_pos h_lt_top
+    rw [Function.comp_apply, logUtility_apply, ENNReal.log_pos_real h_pos.ne' h_lt_top.ne, llr]
+  -- an e-variable equal to `∞` on a `Q`-null set charged by `P`, and to `1` elsewhere
+  obtain ⟨s, hs, hQs, hPs⟩ : ∃ s, MeasurableSet s ∧ Q s = 0 ∧ P s ≠ 0 := by
+    by_contra! h
+    exact h_ac (Measure.AbsolutelyContinuous.mk fun s hs hQs ↦ h s hs hQs)
+  classical
+  have hX : IsEVar (fun x ↦ if x ∈ s then ∞ else 1) {Q} :=
+    .of_lintegral_le_one hQ (Measurable.ite hs measurable_const measurable_const) fun μ hμ ↦ by
+      obtain rfl : μ = Q := hμ
+      rw [lintegral_congr_ae (g := fun _ ↦ 1)]
+      · simp
+      filter_upwards [measure_eq_zero_iff_ae_notMem.mp hQs] with x hx
+      simp [hx]
+  rw [klDiv_of_not_ac h_ac, EReal.coe_ennreal_top]
+  refine le_of_eq_of_le ?_ (hX.eintegral_le_maxUtility P logUtility)
+  rw [eintegral_eq_lintegral_of_nonneg fun x ↦ by
+    by_cases hx : x ∈ s <;> simp [hx, logUtility_apply]]
+  rw [lintegral_congr (g := s.indicator fun _ ↦ ∞) fun x ↦ by
+    by_cases hx : x ∈ s <;> simp [hx, logUtility_apply], lintegral_indicator_const hs,
+    ENNReal.top_mul hPs, EReal.coe_ennreal_top]
 
 end ProbabilityTheory

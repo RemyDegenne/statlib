@@ -6,6 +6,9 @@ Authors: Rémy Degenne, Gaëtan Serré
 module
 
 public import Statlib.EValues.Product
+public import Statlib.EValues.RIPr
+public import Statlib.Divergence.Chernoff
+public import Statlib.Divergence.Renyi.Variational
 
 /-!
 # E-variable divergences
@@ -16,9 +19,9 @@ the e-Rényi divergence of order `α` between `S` and `T` is
 `(1 - α)⁻¹ * ⨅ R, (α * maxUtility R S logUtility + (1 - α) * maxUtility R T logUtility)`,
 and the e-Chernoff divergence is `⨅ R, max (maxUtility R S logUtility) (maxUtility R T logUtility)`,
 where the infima are over probability measures `R`. For a probability measure `P`,
-`maxUtility R {P} logUtility` is the Kullback-Leibler divergence of `R` from `P`, and for singletons
-these formulas are the variational characterizations of the Rényi divergence and of the Chernoff
-information.
+`maxUtility R {P} logUtility` is the Kullback-Leibler divergence of `R` from `P`
+(`maxUtility_singleton_eq_klDiv`), and for singletons these formulas are the variational
+characterizations of the Rényi divergence and of the Chernoff information.
 
 They share the properties of the classical divergences: they satisfy a data processing inequality,
 the e-Rényi divergence is additive on products, and the e-Chernoff divergence is subadditive.
@@ -36,6 +39,9 @@ the e-Rényi divergence is additive on products, and the e-Chernoff divergence i
 * `echernoffDiv_prod_le`: the e-Chernoff divergence between sets of product measures is at most the
   sum of the e-Chernoff divergences.
 * `one_sub_mul_erenyiDiv_le_echernoffDiv`: `(1 - α) * erenyiDiv α S T ≤ echernoffDiv S T`.
+* `erenyiDiv_singleton`, `echernoffDiv_singleton`: for probability measures `P` and `Q`,
+  `erenyiDiv α {P} {Q} = renyiDiv α P Q` for `α ∈ (0, 1)` and
+  `echernoffDiv {P} {Q} = chernoffDiv 1 P Q`.
 * `erenyiDiv_eq_two_mul_echernoffDiv_of_involutive`: if `T` is the image of `S` by a measurable
   involution, the e-Rényi divergence of order `1/2` is twice the e-Chernoff divergence.
 
@@ -140,6 +146,45 @@ lemma one_sub_mul_erenyiDiv_le_echernoffDiv : (1 - α) * erenyiDiv α S T ≤ ec
     gcongr
     exacts [le_max_left _ _, le_max_right _ _]
   _ = max a b := by rw [← add_mul, add_tsub_cancel_of_le hα.le, one_mul]
+
+/-! ### Singletons
+
+For probability measures, `maxUtility R {P} logUtility = klDiv R P`
+(`maxUtility_singleton_eq_klDiv`), so the e-divergences between singletons are the classical
+divergences. -/
+
+/-- For probability measures `P`, `Q` and `α ∈ (0, 1)`, the e-Rényi divergence between `{P}` and
+`{Q}` is the Rényi divergence of order `α`. This is the variational formula
+`(1 - α) * Rα(P, Q) = ⨅ R, (α * KL(R, P) + (1 - α) * KL(R, Q))` (`mul_renyiDiv_eq_iInf_klDiv`). -/
+theorem erenyiDiv_singleton (P Q : Measure 𝓧) [IsProbabilityMeasure P] [IsProbabilityMeasure Q]
+    (hα0 : 0 < α) (hα1 : α < 1) :
+    erenyiDiv α {P} {Q} = renyiDiv α.toReal P Q := by
+  obtain ⟨a, ha0, rfl⟩ : ∃ a : ℝ, 0 ≤ a ∧ α = ENNReal.ofReal a :=
+    ⟨α.toReal, ENNReal.toReal_nonneg, (ENNReal.ofReal_toReal hα1.ne_top).symm⟩
+  have ha1 : a < 1 := ENNReal.ofReal_lt_one.mp hα1
+  have h1α : 1 - ENNReal.ofReal a = ENNReal.ofReal (1 - a) := by
+    rw [ENNReal.ofReal_sub _ ha0, ENNReal.ofReal_one]
+  have h_inf : ⨅ (R : Measure 𝓧) (_ : IsProbabilityMeasure R),
+      ENNReal.ofReal a * (maxUtility R {P} logUtility).toENNReal
+        + ENNReal.ofReal (1 - a) * (maxUtility R {Q} logUtility).toENNReal
+      = ENNReal.ofReal (1 - a) * renyiDiv a P Q := by
+    rw [mul_renyiDiv_eq_iInf_klDiv (ENNReal.ofReal_pos.mp hα0) ha1]
+    refine iInf_congr fun R ↦ iInf_congr fun _ ↦ ?_
+    rw [maxUtility_singleton_eq_klDiv, maxUtility_singleton_eq_klDiv, EReal.toENNReal_coe,
+      EReal.toENNReal_coe]
+  rw [erenyiDiv, ENNReal.toReal_ofReal ha0, h1α, h_inf,
+    ENNReal.inv_mul_cancel_left (ENNReal.ofReal_pos.mpr (sub_pos.mpr ha1)).ne'
+      ENNReal.ofReal_ne_top]
+
+/-- For probability measures `P` and `Q`, the e-Chernoff divergence between `{P}` and `{Q}` is the
+Chernoff information `chernoffDiv 1 P Q = ⨅ R, max (KL(R, P)) (KL(R, Q))`. -/
+theorem echernoffDiv_singleton (P Q : Measure 𝓧) [IsProbabilityMeasure P]
+    [IsProbabilityMeasure Q] :
+    echernoffDiv {P} {Q} = chernoffDiv 1 P Q := by
+  rw [echernoffDiv, chernoffDiv_one]
+  refine iInf_congr fun R ↦ iInf_congr fun _ ↦ ?_
+  rw [maxUtility_singleton_eq_klDiv, maxUtility_singleton_eq_klDiv, EReal.toENNReal_coe,
+    EReal.toENNReal_coe]
 
 /-! ### Data processing inequalities -/
 

@@ -7,6 +7,8 @@ module
 
 public import Mathlib.Analysis.SpecialFunctions.BinaryEntropy
 public import Statlib.ForMathlib.Analysis.SpecialFunctions.Log.Basic
+public import Mathlib.InformationTheory.KullbackLeibler.Basic
+public import Statlib.ForMathlib.Probability.Distributions.Bernoulli
 
 /-!
 # The Kullback-Leibler divergence between Bernoulli distributions
@@ -15,9 +17,9 @@ The Kullback-Leibler divergence between two Bernoulli distributions with paramet
 is `p * log (p / q) + (1 - p) * log ((1 - p) / (1 - q))` for `q ∈ (0, 1)`. We define it as the
 real-valued function `klBerReal` given by that formula.
 
-The definition and its basic API are copied from LMLPapers
-(`LeanMachineLearning/ForMathlib/InformationTheory/KullbackLeibler/Bernoulli.lean`), which also
-defines the `ℝ≥0∞`-valued version and identifies it with `klDiv` between Bernoulli measures.
+The definition, its basic API and its identification with `klDiv` between Bernoulli measures are
+copied from LMLPapers (`LeanMachineLearning/ForMathlib/InformationTheory/KullbackLeibler/
+Bernoulli.lean`), which also defines an `ℝ≥0∞`-valued version.
 
 ## Main definitions
 
@@ -28,6 +30,8 @@ defines the `ℝ≥0∞`-valued version and identifies it with `klDiv` between B
 
 * `klBerReal_one_sub`: `klBerReal (1 - p) (1 - q) = klBerReal p q`.
 * `klBerReal_nonneg`: Gibbs' inequality, `0 ≤ klBerReal p q` for `p ∈ [0, 1]` and `q ∈ (0, 1)`.
+* `klDiv_bernoulliMeasure_eq_klBerReal`: for `x ≠ y` and `q ∉ {0, 1}`,
+  `klDiv Ber(x, y, p) Ber(x, y, q) = ENNReal.ofReal (klBerReal p q)`.
 -/
 
 @[expose] public section
@@ -86,5 +90,36 @@ lemma klBerReal_nonneg (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (hq0 : 0 < q) (hq1 : q < 
   have h₂ := sub_le_mul_log_div (sub_nonneg.mpr hp1) (sub_pos.mpr hq1)
   rw [klBerReal]
   linarith
+
+section BernoulliMeasure
+
+open MeasureTheory ProbabilityTheory unitInterval
+
+variable {𝓧 : Type*} [MeasurableSpace 𝓧] [MeasurableSingletonClass 𝓧] {x y : 𝓧}
+
+/-- The Kullback-Leibler divergence between the Bernoulli measures `Ber(x, y, p)` and
+`Ber(x, y, q)`, for `x ≠ y` and `q ∉ {0, 1}`, is `klBerReal p q`. -/
+lemma klDiv_bernoulliMeasure_eq_klBerReal (hxy : x ≠ y) (p : I) {q : I} (hq : q ≠ 0)
+    (hq1 : q ≠ 1) :
+    klDiv Ber(x, y, p) Ber(x, y, q) = ENNReal.ofReal (klBerReal p q) := by
+  classical
+  have hq0 : (0 : ℝ) < q := coe_pos.2 (unitInterval.pos_iff_ne_zero.2 hq)
+  have hq1' : (0 : ℝ) < 1 - q := sub_pos.2 (coe_lt_one.2 (unitInterval.lt_one_iff_ne_one.2 hq1))
+  have hp0 : (0 : ℝ) ≤ p := p.2.1
+  have hp1 : (0 : ℝ) ≤ 1 - p := sub_nonneg.2 p.2.2
+  rw [klDiv_eq_lintegral_klFun_of_ac (bernoulliMeasure_absolutelyContinuous hxy p hq hq1),
+    lintegral_congr_ae ((rnDeriv_bernoulliMeasure hxy p hq hq1).mono fun z hz ↦ by rw [hz]),
+    lintegral_bernoulliMeasure]
+  simp only [ite_true, ite_eq_right hxy.symm, ENNReal.toReal_ofReal (div_nonneg hp0 hq0.le),
+    ENNReal.toReal_ofReal (div_nonneg hp1 hq1'.le)]
+  rw [← ENNReal.ofReal_mul hq0.le, ← ENNReal.ofReal_mul hq1'.le, ← ENNReal.ofReal_add
+      (mul_nonneg hq0.le (klFun_nonneg (div_nonneg hp0 hq0.le)))
+      (mul_nonneg hq1'.le (klFun_nonneg (div_nonneg hp1 hq1'.le)))]
+  congr 1
+  simp only [klFun, klBerReal]
+  field_simp
+  ring
+
+end BernoulliMeasure
 
 end InformationTheory
