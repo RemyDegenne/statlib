@@ -33,11 +33,12 @@ and neither map can increase the divergences (data processing inequality).
   and the e-Chernoff divergence between the probability measures on the unit interval with mean at
   most `δ` and those with mean at least `η` are the Rényi divergence of order `α` and the Chernoff
   information between the Bernoulli distributions with parameters `δ` and `η`.
-* `le_erenyiDiv_of_separated`, `le_echernoffDiv_of_separated`: the corresponding explicit lower
-  bounds on the divergences between sets of probability measures for which the mean of a function
-  with values in the unit interval is at most `δ` and at least `η`. For `η = 1 - δ` and order
-  `1/2`, the values are given by `erenyiDiv_inv_two_bernoulli_one_sub` and
-  `echernoffDiv_bernoulli_one_sub`.
+* `le_erenyiDiv_of_separated`, `le_echernoffDiv_of_separated`: the corresponding lower bounds on
+  the divergences between sets of probability measures for which the mean of a function with values
+  in the unit interval is at most `δ` and at least `η`. The values of the Rényi divergence and of
+  the Chernoff information between Bernoulli distributions are given by
+  `renyiDiv_bernoulliMeasure` and `chernoffDiv_one_bernoulliMeasure`; for `η = 1 - δ` and order
+  `1/2`, by `erenyiDiv_inv_two_bernoulli_one_sub` and `echernoffDiv_bernoulli_one_sub`.
 -/
 
 @[expose] public section
@@ -144,28 +145,27 @@ theorem echernoffDiv_bernoulli_le_of_integral_mem {f : 𝓧 → I} (hf : Measura
 
 /-! ### Closed forms and lower bounds -/
 
-/-- For `δ ≤ η`, the e-Rényi divergence of order `α < 1` between the probability measures on the
-unit interval with mean at most `δ` and those with mean at least `η` is the Rényi divergence of
-order `α` between the Bernoulli distributions with parameters `δ` and `η`. -/
-theorem erenyiDiv_bounded (hα : α < 1) {δ η : ℝ} (hδ_pos : 0 < δ) (hδη : δ ≤ η) (hη : η < 1) :
+/-- For `0 < δ ≤ η < 1`, the e-Rényi divergence of order `α < 1` between the probability measures
+on the unit interval with mean at most `δ` and those with mean at least `η` is the Rényi divergence
+of order `α` between the Bernoulli distributions with parameters `δ` and `η`, whose value is given
+by `renyiDiv_bernoulliMeasure`. -/
+theorem erenyiDiv_bounded (hα : α < 1) {δ η : I} (hδ_pos : 0 < δ) (hδη : δ ≤ η) (hη : η < 1) :
     erenyiDiv α {μ : Measure I | IsProbabilityMeasure μ ∧ ∫ x, (x : ℝ) ∂μ ≤ δ}
-        {μ : Measure I | IsProbabilityMeasure μ ∧ η ≤ ∫ x, (x : ℝ) ∂μ}
-      = ENNReal.ofReal ((α.toReal - 1)⁻¹ * Real.log (δ ^ α.toReal * η ^ (1 - α.toReal)
-        + (1 - δ) ^ α.toReal * (1 - η) ^ (1 - α.toReal))) :=
+        {μ : Measure I | IsProbabilityMeasure μ ∧ (η : ℝ) ≤ ∫ x, (x : ℝ) ∂μ}
+      = renyiDiv α.toReal Ber(true, false, δ) Ber(true, false, η) :=
   (erenyiDiv_integral_mem_eq_erenyiDiv_bernoulli (Set.Iic δ) (Set.Ici η)).trans
     (erenyiDiv_bernoulli hα hδ_pos hδη hη)
 
-/-- For `δ < η`, the e-Chernoff divergence between the probability measures on the unit interval
-with mean at most `δ` and those with mean at least `η` is the Chernoff information between the
-Bernoulli distributions with parameters `δ` and `η`, `klBerReal r δ` for the `r` given by
-`echernoffDiv_bernoulli`. -/
-theorem echernoffDiv_bounded {δ η : ℝ} (hδ_pos : 0 < δ) (hδη : δ < η) (hη : η < 1) {r : ℝ}
-    (hr : r = Real.log ((1 - δ) / (1 - η)) / (Real.log (η / δ) + Real.log ((1 - δ) / (1 - η)))) :
+/-- For `0 < δ < η < 1`, the e-Chernoff divergence between the probability measures on the unit
+interval with mean at most `δ` and those with mean at least `η` is the Chernoff information between
+the Bernoulli distributions with parameters `δ` and `η`, whose value is given by
+`chernoffDiv_one_bernoulliMeasure`. -/
+theorem echernoffDiv_bounded {δ η : I} (hδ_pos : 0 < δ) (hδη : δ < η) (hη : η < 1) :
     echernoffDiv {μ : Measure I | IsProbabilityMeasure μ ∧ ∫ x, (x : ℝ) ∂μ ≤ δ}
-        {μ : Measure I | IsProbabilityMeasure μ ∧ η ≤ ∫ x, (x : ℝ) ∂μ}
-      = ENNReal.ofReal (klBerReal r δ) :=
+        {μ : Measure I | IsProbabilityMeasure μ ∧ (η : ℝ) ≤ ∫ x, (x : ℝ) ∂μ}
+      = chernoffDiv 1 Ber(true, false, δ) Ber(true, false, η) :=
   (echernoffDiv_integral_mem_eq_echernoffDiv_bernoulli (Set.Iic δ) (Set.Ici η)).trans
-    (echernoffDiv_bernoulli hδ_pos hδη hη hr)
+    (echernoffDiv_bernoulli hδ_pos hδη hη)
 
 /-- If the mean of a measurable `f : 𝓧 → I` is at most `δ` under the probability measures of `S`
 and at least `η ≥ δ` under those of `T`, the e-Rényi divergence of order `α < 1` between `S` and
@@ -173,25 +173,21 @@ and at least `η ≥ δ` under those of `T`, the e-Rényi divergence of order `�
 parameters `δ` and `η`. -/
 theorem le_erenyiDiv_of_separated {f : 𝓧 → I} (hf : Measurable f)
     (hS : ∀ μ ∈ S, IsProbabilityMeasure μ) (hT : ∀ μ ∈ T, IsProbabilityMeasure μ) (hα : α < 1)
-    {δ η : ℝ} (hδ_pos : 0 < δ) (hδη : δ ≤ η) (hη : η < 1)
-    (hSf : ∀ μ ∈ S, ∫ ω, (f ω : ℝ) ∂μ ≤ δ) (hTf : ∀ ν ∈ T, η ≤ ∫ ω, (f ω : ℝ) ∂ν) :
-    ENNReal.ofReal ((α.toReal - 1)⁻¹ * Real.log (δ ^ α.toReal * η ^ (1 - α.toReal)
-        + (1 - δ) ^ α.toReal * (1 - η) ^ (1 - α.toReal)))
-      ≤ erenyiDiv α S T :=
+    {δ η : I} (hδ_pos : 0 < δ) (hδη : δ ≤ η) (hη : η < 1)
+    (hSf : ∀ μ ∈ S, ∫ ω, (f ω : ℝ) ∂μ ≤ δ) (hTf : ∀ ν ∈ T, (η : ℝ) ≤ ∫ ω, (f ω : ℝ) ∂ν) :
+    renyiDiv α.toReal Ber(true, false, δ) Ber(true, false, η) ≤ erenyiDiv α S T :=
   (erenyiDiv_bernoulli hα hδ_pos hδη hη).symm.le.trans
     (erenyiDiv_bernoulli_le_of_integral_mem hf hS hT (C₁ := Set.Iic δ) (C₂ := Set.Ici η) hSf hTf)
 
 /-- If the mean of a measurable `f : 𝓧 → I` is at most `δ` under the probability measures of `S`
 and at least `η > δ` under those of `T`, the e-Chernoff divergence between `S` and `T` is at least
-the Chernoff information between the Bernoulli distributions with parameters `δ` and `η`,
-`klBerReal r δ` for the `r` given by `echernoffDiv_bernoulli`. -/
+the Chernoff information between the Bernoulli distributions with parameters `δ` and `η`. -/
 theorem le_echernoffDiv_of_separated {f : 𝓧 → I} (hf : Measurable f)
     (hS : ∀ μ ∈ S, IsProbabilityMeasure μ) (hT : ∀ μ ∈ T, IsProbabilityMeasure μ)
-    {δ η : ℝ} (hδ_pos : 0 < δ) (hδη : δ < η) (hη : η < 1) {r : ℝ}
-    (hr : r = Real.log ((1 - δ) / (1 - η)) / (Real.log (η / δ) + Real.log ((1 - δ) / (1 - η))))
-    (hSf : ∀ μ ∈ S, ∫ ω, (f ω : ℝ) ∂μ ≤ δ) (hTf : ∀ ν ∈ T, η ≤ ∫ ω, (f ω : ℝ) ∂ν) :
-    ENNReal.ofReal (klBerReal r δ) ≤ echernoffDiv S T :=
-  (echernoffDiv_bernoulli hδ_pos hδη hη hr).symm.le.trans
+    {δ η : I} (hδ_pos : 0 < δ) (hδη : δ < η) (hη : η < 1)
+    (hSf : ∀ μ ∈ S, ∫ ω, (f ω : ℝ) ∂μ ≤ δ) (hTf : ∀ ν ∈ T, (η : ℝ) ≤ ∫ ω, (f ω : ℝ) ∂ν) :
+    chernoffDiv 1 Ber(true, false, δ) Ber(true, false, η) ≤ echernoffDiv S T :=
+  (echernoffDiv_bernoulli hδ_pos hδη hη).symm.le.trans
     (echernoffDiv_bernoulli_le_of_integral_mem hf hS hT (C₁ := Set.Iic δ) (C₂ := Set.Ici η) hSf
       hTf)
 

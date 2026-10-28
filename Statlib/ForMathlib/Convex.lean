@@ -50,6 +50,120 @@ lemma ConvexOn.add_deriv_mul_le {S : Set ℝ} {f : ℝ → ℝ} {x y : ℝ}
     field_simp at h_cvx
     linarith
 
+/-- If `f` is convex on `(0, ∞)` with `f 1 = 0`, then `max f 0` is nonincreasing on `(0, 1]`. -/
+lemma ConvexOn.antitoneOn_ofReal_comp {f : ℝ → ℝ} (hf : ConvexOn ℝ (Ioi 0) f) (hf_one : f 1 = 0) :
+    AntitoneOn (fun x ↦ ENNReal.ofReal (f x)) (Ioc 0 1) := by
+  intro x hx y hy hxy
+  rcases eq_or_lt_of_le hy.2 with rfl | hy1
+  · simp [hf_one]
+  by_cases hfy : f y ≤ 0
+  · simp [ENNReal.ofReal_of_nonpos hfy]
+  refine ENNReal.ofReal_le_ofReal ?_
+  refine hf.le_left_of_right_le'' hx.1 (mem_Ioi.mpr one_pos) hxy hy1 ?_
+  rw [hf_one]
+  exact (not_le.mp hfy).le
+
+/-- If `f` is convex on `(0, ∞)` with `f 1 = 0`, then `max f 0` is nondecreasing on `[1, ∞)`. -/
+lemma ConvexOn.monotoneOn_ofReal_comp {f : ℝ → ℝ} (hf : ConvexOn ℝ (Ioi 0) f) (hf_one : f 1 = 0) :
+    MonotoneOn (fun x ↦ ENNReal.ofReal (f x)) (Ici 1) := by
+  intro x hx y _ hxy
+  rcases eq_or_lt_of_le (mem_Ici.mp hx) with rfl | hx1
+  · simp [hf_one]
+  by_cases hfx : f x ≤ 0
+  · simp [ENNReal.ofReal_of_nonpos hfx]
+  refine ENNReal.ofReal_le_ofReal ?_
+  refine hf.le_right_of_left_le'' (mem_Ioi.mpr one_pos)
+    (mem_Ioi.mpr (zero_lt_one.trans (hx1.trans_le hxy))) hx1 hxy ?_
+  rw [hf_one]
+  exact (not_le.mp hfx).le
+
+/-- A convex function lies above its tangent line with slope the right derivative, at any interior
+point of its domain. -/
+lemma ConvexOn.add_rightDeriv_mul_le {S : Set ℝ} {f : ℝ → ℝ} {x y : ℝ}
+    (hfc : ConvexOn ℝ S f) (hx : x ∈ S) (hy : y ∈ interior S) :
+    f y + derivWithin f (Ioi y) y * (x - y) ≤ f x := by
+  rcases lt_trichotomy x y with hxy | rfl | hyx
+  · have h := (hfc.slope_le_leftDeriv_of_mem_interior hx hy hxy).trans
+      (hfc.leftDeriv_le_rightDeriv_of_mem_interior hy)
+    rw [slope_def_field, div_le_iff₀ (sub_pos.mpr hxy)] at h
+    linarith
+  · simp
+  · have h := hfc.rightDeriv_le_slope_of_mem_interior hy hx hyx
+    rw [slope_def_field, le_div_iff₀ (sub_pos.mpr hyx)] at h
+    linarith
+
+/-- The right derivative of a convex function is right-continuous at the interior points of its
+domain. This is adapted from the testing-lower-bounds project of Rémy Degenne and Lorenzo Luccioli
+(https://github.com/RemyDegenne/testing-lower-bounds). -/
+lemma ConvexOn.continuousWithinAt_rightDeriv_of_mem_interior {S : Set ℝ} {f : ℝ → ℝ} {w : ℝ}
+    (hfc : ConvexOn ℝ S f) (hw : w ∈ interior S) :
+    ContinuousWithinAt (fun x ↦ derivWithin f (Ioi x) x) (Ici w) w := by
+  set r := fun x ↦ derivWithin f (Ioi x) x with hr
+  have h_mono : MonotoneOn r (interior S) := hfc.monotoneOn_rightDeriv
+  rw [← continuousWithinAt_Ioi_iff_Ici, ContinuousWithinAt]
+  obtain ⟨a, b, hwab, habs⟩ :=
+    mem_nhds_iff_exists_Ioo_subset.mp (mem_interior_iff_mem_nhds.mp hw)
+  have h_int : Ioo a b ⊆ interior S := isOpen_Ioo.subset_interior_iff.mpr habs
+  have h_mem : ∀ z ∈ Ioo w b, z ∈ interior S := fun z hz ↦ h_int ⟨hwab.1.trans hz.1, hz.2⟩
+  have h_bdd : BddBelow (r '' Ioo w b) := by
+    refine ⟨r w, ?_⟩
+    rintro _ ⟨z, hz, rfl⟩
+    exact h_mono hw (h_mem z hz) hz.1.le
+  -- `r` is monotone, so it tends to the infimum of its values on `(w, b)`, which is `r w`
+  have h_lim := (h_mono.mono h_mem).tendsto_nhdsWithin_Ioo_right (nonempty_Ioo.mpr hwab.2) h_bdd
+  convert h_lim
+  refine le_antisymm (le_csInf ((nonempty_Ioo.mpr hwab.2).image _) ?_) ?_
+  · rintro _ ⟨z, hz, rfl⟩
+    exact h_mono hw (h_mem z hz) hz.1.le
+  · -- the infimum is below every slope `slope f w y`, hence below `r w`
+    rw [hr]
+    beta_reduce
+    rw [hfc.rightDeriv_eq_sInf_slope_of_mem_interior hw]
+    refine le_csInf ?_ ?_
+    · obtain ⟨z, hwz, hzb⟩ := exists_between hwab.2
+      exact ⟨_, z, ⟨habs ⟨hwab.1.trans hwz, hzb⟩, hwz⟩, rfl⟩
+    rintro _ ⟨y, ⟨hys, hwy⟩, rfl⟩
+    have h_cont : ContinuousWithinAt f (Ioi w) w :=
+      (hfc.differentiableWithinAt_Ioi_of_mem_interior hw).continuousWithinAt
+    have slope_lim : Filter.Tendsto (slope f y) (nhdsWithin w (Ioi w)) (nhds (slope f y w)) :=
+      ((continuousWithinAt_id.sub continuousWithinAt_const).inv₀ (sub_ne_zero.2 hwy.ne)).smul
+        (h_cont.sub continuousWithinAt_const) |>.tendsto
+    rw [slope_comm] at slope_lim
+    refine le_of_tendsto_of_tendsto tendsto_const_nhds slope_lim ?_
+    filter_upwards [Ioo_mem_nhdsGT (lt_min hwy hwab.2)] with z hz
+    have hz' : z ∈ Ioo w b := ⟨hz.1, hz.2.trans_le (min_le_right _ _)⟩
+    calc sInf (r '' Ioo w b) ≤ r z := csInf_le h_bdd ⟨z, hz', rfl⟩
+    _ ≤ slope f z y := hfc.rightDeriv_le_slope_of_mem_interior (h_mem z hz') hys
+        (hz.2.trans_le (min_le_left _ _))
+    _ = slope f y z := slope_comm _ _ _
+
+/-- A convex subset of `ℝ` with empty interior has at most one point. -/
+lemma Convex.subsingleton_of_interior_eq_empty {S : Set ℝ} (hS : Convex ℝ S)
+    (h : interior S = ∅) :
+    S.Subsingleton := by
+  intro x hx y hy
+  by_contra h_ne
+  wlog h_lt : x < y generalizing x y
+  · exact this hy hx (Ne.symm h_ne) ((not_lt.mp h_lt).lt_of_ne (Ne.symm h_ne))
+  have h_sub : Ioo x y ⊆ interior S := by
+    rw [← interior_Icc]
+    exact interior_mono (hS.ordConnected.out hx hy)
+  rw [h, subset_empty_iff, Ioo_eq_empty_iff] at h_sub
+  exact h_sub h_lt
+
+/-- A convex function on a subset of `ℝ` is bounded below on it by an affine function. -/
+lemma ConvexOn.exists_affine_le {S : Set ℝ} {f : ℝ → ℝ} (hf : ConvexOn ℝ S f) :
+    ∃ c c', ∀ x ∈ S, c * x + c' ≤ f x := by
+  rcases (interior S).eq_empty_or_nonempty with h | ⟨y, hy⟩
+  · rcases S.eq_empty_or_nonempty with rfl | ⟨y, hy⟩
+    · simp
+    refine ⟨0, f y, fun x hx ↦ ?_⟩
+    simp [hf.1.subsingleton_of_interior_eq_empty h hx hy]
+  · refine ⟨derivWithin f (Ioi y) y, f y - derivWithin f (Ioi y) y * y, fun x hx ↦ ?_⟩
+    calc derivWithin f (Ioi y) y * x + (f y - derivWithin f (Ioi y) y * y)
+    _ = f y + derivWithin f (Ioi y) y * (x - y) := by ring
+    _ ≤ f x := hf.add_rightDeriv_mul_le hx hy
+
 lemma StrictConvexOn.add_deriv_mul_lt {S : Set ℝ} {f : ℝ → ℝ} {x y : ℝ}
     (hfc : StrictConvexOn ℝ S f) (hx : x ∈ S) (hy : y ∈ S) (hxy : x ≠ y)
     (hfd : DifferentiableAt ℝ f y) :
