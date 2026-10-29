@@ -10,6 +10,7 @@ public import Mathlib.Probability.Notation
 public import Statlib.Divergence.FDiv.DivFunction.OfReal
 public import Statlib.ForMathlib.MeasureTheory.Measure.Decomposition.RadonNikodym
 public import Mathlib.MeasureTheory.Measure.Decomposition.IntegralRNDeriv
+public import Statlib.ForMathlib.Analysis.Convex.Deriv
 
 /-!
 # f-Divergences
@@ -25,9 +26,16 @@ public import Mathlib.MeasureTheory.Measure.Decomposition.IntegralRNDeriv
   cases of the Lebesgue decomposition.
 * `fDiv_eq_add_withDensity_derivAtTop`, `fDiv_add_eq_add_withDensity_singularPart`:
   decompositions of `fDiv` according to the Lebesgue decomposition of `μ` with respect to `ν`.
+* `fDiv_eq_lintegral_mixtureFun`: `fDiv f μ ν = ∫⁻ x, f.mixtureFun (∂μ/∂(μ + ν) x) ∂(μ + ν)`, a
+  representation of `fDiv` as a single integral, without absolute continuity hypothesis.
 * `fDiv_eq_top_iff`, `fDiv_ne_top_iff`: finiteness of `fDiv`.
 * `le_fDiv`: Jensen-type lower bound, `ν univ * f (μ univ / ν univ) ≤ fDiv f μ ν`. For probability
   measures it reads `f 1 = 0 ≤ fDiv f μ ν`, and in general it bounds `fDiv` by the masses.
+* `fDiv_mono`, `fDiv_le_mul_fDiv_of_le`: monotonicity in the divergence function. It suffices to
+  compare the divergence functions on `(0, ∞)`.
+* `fDiv_ofReal_le_of_deriv2_le`: for divergence functions built from twice differentiable real
+  functions `φ` and `ψ` with `φ 1 = ψ 1 = 0` and `φ' 1 = c * ψ' 1`, if `φ'' ≤ c * ψ''` on `(0, ∞)`
+  then `fDiv φ μ ν ≤ c * fDiv ψ μ ν`.
 * `fDiv_eq_zero_iff`: for a divergence function which is strictly convex on a neighborhood of `1`,
   `fDiv f μ ν = 0 ↔ μ = ν` for finite measures.
 * `fDiv_map_measurableEmbedding`: invariance under measurable embeddings.
@@ -39,6 +47,11 @@ continuous and vanishes at `1`. We use `ℝ≥0∞ → ℝ≥0∞` so that `fDiv
 Lebesgue integral, without integrability conditions, and takes values in `ℝ≥0∞`.
 The results that need derivatives or the convexity lemmas of Mathlib use the real function
 `f.realFun : ℝ → ℝ` instead.
+
+## References
+
+* R. Degenne, *An inequality between Jensen-Shannon and Hellinger divergences*, short note
+  (Lemmas 5 and 6, for `fDiv_ofReal_le_of_deriv2_le`).
 
 -/
 
@@ -172,6 +185,49 @@ lemma fDiv_eq_add_withDensity_derivAtTop
   conv_lhs => rw [μ.haveLebesgueDecomposition_add ν, add_comm,
      fDiv_absolutelyContinuous_add_mutuallySingular (withDensity_absolutelyContinuous _ _)
        (Measure.mutuallySingular_singularPart _ _)]
+
+/-- **The f-divergence as an integral with respect to `μ + ν`**: if `p = ∂μ/∂(μ + ν)`, then
+`fDiv f μ ν = ∫⁻ x, f.mixtureFun (p x) ∂(μ + ν)`. The singular part of `μ` with respect to `ν`
+corresponds to the set where `p = 1`. -/
+lemma fDiv_eq_lintegral_mixtureFun (μ ν : Measure α) [SigmaFinite μ] [SigmaFinite ν] :
+    fDiv f μ ν = ∫⁻ x, f.mixtureFun ((∂μ/∂(μ + ν)) x) ∂(μ + ν) := by
+  have hνρ : ν ≪ μ + ν := Measure.AbsolutelyContinuous.rfl.add_right' μ
+  -- the singular part of `μ` with respect to `ν` is the restriction of `μ` to the set `N` where
+  -- `∂ν/∂(μ + ν)` vanishes
+  set N := {x | (∂ν/∂(μ + ν)) x = 0} with hN_def
+  have hN : MeasurableSet N := measurableSet_eq_fun (ν.measurable_rnDeriv _) measurable_const
+  have hpq : ∀ᵐ x ∂(μ + ν), (∂μ/∂(μ + ν)) x + (∂ν/∂(μ + ν)) x = 1 := by
+    filter_upwards [Measure.rnDeriv_add' μ ν (μ + ν), (μ + ν).rnDeriv_self] with x h1 h2
+    rw [← Pi.add_apply, ← h1, h2]
+  have hνN : ν N = 0 := by
+    rw [← Measure.setLIntegral_rnDeriv hνρ, setLIntegral_congr_fun hN (g := 0) fun x hx ↦ hx]
+    simp
+  -- we write both terms of `fDiv f μ ν` as integrals with respect to `μ + ν`, and compare the
+  -- integrands on `N` and on its complement
+  have h1 : ∫⁻ x, f ((∂μ/∂ν) x) ∂ν
+      = ∫⁻ x, (∂ν/∂(μ + ν)) x * f ((∂μ/∂(μ + ν)) x / (∂ν/∂(μ + ν)) x) ∂(μ + ν) := by
+    rw [lintegral_rnDeriv_mul hνρ (f := fun x ↦ f ((∂μ/∂(μ + ν)) x / (∂ν/∂(μ + ν)) x))
+      (f.continuous.measurable.comp ((μ.measurable_rnDeriv _).div
+        (ν.measurable_rnDeriv _))).aemeasurable]
+    refine lintegral_congr_ae ?_
+    filter_upwards [Measure.rnDeriv_eq_div_rnDeriv_add μ ν] with x hx
+    rw [hx]
+  have h2 : f.derivAtTop * μ N = ∫⁻ x, N.indicator (fun _ ↦ f.derivAtTop) x ∂(μ + ν) := by
+    rw [lintegral_indicator hN, setLIntegral_const, Measure.add_apply, hνN, add_zero]
+  rw [fDiv, Measure.singularPart_eq_restrict_rnDeriv_add_eq_zero, Measure.restrict_apply_univ,
+    h1, h2, ← lintegral_add_right _ (measurable_const.indicator hN)]
+  refine lintegral_congr_ae ?_
+  filter_upwards [hpq] with x hx
+  by_cases hqx : (∂ν/∂(μ + ν)) x = 0
+  · have hpx : (∂μ/∂(μ + ν)) x = 1 := by simpa [hqx] using hx
+    have hxN : x ∈ N := hqx
+    simp [hqx, hpx, hxN, DivFunction.mixtureFun_of_one_le]
+  · have hp_top : (∂μ/∂(μ + ν)) x ≠ ∞ := ne_top_of_le_ne_top ENNReal.one_ne_top (hx ▸ le_self_add)
+    have hpx : (∂μ/∂(μ + ν)) x < 1 := hx ▸ ENNReal.lt_add_right hp_top hqx
+    have h1p : 1 - (∂μ/∂(μ + ν)) x = (∂ν/∂(μ + ν)) x :=
+      ENNReal.sub_eq_of_eq_add hp_top (by rw [← hx, add_comm])
+    have hxN : x ∉ N := hqx
+    simp [DivFunction.mixtureFun_of_lt_one hpx, h1p, hxN]
 
 end AbsolutelyContinuousMutuallySingular
 
@@ -365,6 +421,14 @@ lemma fDiv_mono_ae (hfg : f ≤ᵐ[ν.map (∂μ/∂ν)] g) (hfg' : f.derivAtTop
 lemma fDiv_mono (hfg : ∀ x, f x ≤ g x) : fDiv f μ ν ≤ fDiv g μ ν :=
   fDiv_mono_ae (.of_forall hfg) (DivFunction.derivAtTop_mono hfg)
 
+/-- If two divergence functions satisfy `f x ≤ c * g x` on `(0, ∞)`, then
+`fDiv f μ ν ≤ c * fDiv g μ ν`. -/
+lemma fDiv_le_mul_fDiv_of_le {c : ℝ≥0} (h : ∀ x, x ≠ 0 → x ≠ ∞ → f x ≤ c * g x)
+    (μ ν : Measure α) :
+    fDiv f μ ν ≤ c * fDiv g μ ν := by
+  rw [← fDiv_smul]
+  exact fDiv_mono (DivFunction.le_of_forall_ne_zero_ne_top (g := c • g) h)
+
 /-- For a divergence function which is strictly convex on a neighborhood `(a, b)` of `1`,
 `fDiv f μ ν = 0 ↔ μ = ν`. -/
 lemma fDiv_eq_zero_iff [IsFiniteMeasure μ] [IsFiniteMeasure ν] {a b : ℝ} (ha : a < 1)
@@ -499,6 +563,25 @@ lemma toReal_fDiv_ofReal_eq_integral_add_of_ac [IsFiniteMeasure μ]
     (fDiv (.ofReal f hf hf_one) μ ν).toReal = ∫ x, f ((∂μ/∂ν) x).toReal ∂ν := by
   rw [fDiv_ofReal_eq_integral_of_ac hf_nonneg h_cont h_int h_ac,
     ENNReal.toReal_ofReal (integral_nonneg fun _ ↦ hf_nonneg _ ENNReal.toReal_nonneg)]
+
+/-- **Comparison of f-divergences from a comparison of second derivatives.**
+Let `φ, ψ : ℝ → ℝ` be convex on `(0, ∞)` and twice differentiable there, with `φ 1 = ψ 1 = 0` and
+`φ' 1 = c * ψ' 1` (for example `φ' 1 = ψ' 1 = 0`). If `φ'' ≤ c * ψ''` on `(0, ∞)`, then the
+f-divergences satisfy `D_φ(μ, ν) ≤ c * D_ψ(μ, ν)`.
+The pointwise inequality `φ ≤ c * ψ` on `(0, ∞)` is `le_mul_of_deriv2_le`. -/
+theorem fDiv_ofReal_le_of_deriv2_le {φ ψ φ' ψ' φ'' ψ'' : ℝ → ℝ} {c : ℝ≥0}
+    (hφ_cvx : ConvexOn ℝ (Ioi 0) φ) (hψ_cvx : ConvexOn ℝ (Ioi 0) ψ)
+    (hφ_one : φ 1 = 0) (hψ_one : ψ 1 = 0)
+    (hφ : ∀ x, 0 < x → HasDerivAt φ (φ' x) x) (hφ' : ∀ x, 0 < x → HasDerivAt φ' (φ'' x) x)
+    (hψ : ∀ x, 0 < x → HasDerivAt ψ (ψ' x) x) (hψ' : ∀ x, 0 < x → HasDerivAt ψ' (ψ'' x) x)
+    (h_deriv_one : φ' 1 = c * ψ' 1) (h : ∀ x, 0 < x → φ'' x ≤ c * ψ'' x) (μ ν : Measure α) :
+    fDiv (DivFunction.ofReal φ hφ_cvx hφ_one) μ ν
+      ≤ c * fDiv (DivFunction.ofReal ψ hψ_cvx hψ_one) μ ν := by
+  refine fDiv_le_mul_fDiv_of_le (fun x hx0 hx_top ↦ ?_) μ ν
+  rw [DivFunction.ofReal_apply hx0 hx_top, DivFunction.ofReal_apply hx0 hx_top,
+    ← ENNReal.ofReal_coe_nnreal, ← ENNReal.ofReal_mul (NNReal.coe_nonneg c)]
+  exact ENNReal.ofReal_le_ofReal <| le_mul_of_deriv2_le (convex_Ioi 0) (by simp) hφ hφ' hψ hψ'
+    (by simp [hφ_one, hψ_one]) h_deriv_one h (ENNReal.toReal_pos hx0 hx_top)
 
 end OfReal
 

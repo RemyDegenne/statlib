@@ -19,6 +19,7 @@ public import Statlib.Divergence.Renyi.Basic
 ## Main statements
 
 * `condRenyiDiv_zero`, `condRenyiDiv_one`: the special cases.
+* `condRenyiDiv_smul_measure`: invariance under scaling of the measure.
 * `renyiDiv_comp_left_le`: `renyiDiv a (κ ∘ₘ μ) (η ∘ₘ μ) ≤ condRenyiDiv a κ η μ`.
 
 This file is adapted from the testing-lower-bounds project of Rémy Degenne and Lorenzo Luccioli
@@ -33,11 +34,15 @@ open scoped ENNReal NNReal Topology
 
 namespace ProbabilityTheory
 
-variable {α β γ : Type*} {mα : MeasurableSpace α} {mβ : MeasurableSpace β} {mγ : MeasurableSpace γ}
-  {μ ν : Measure α} {κ η : Kernel α β} {a : ℝ}
+variable {α β : Type*} {mα : MeasurableSpace α} {mβ : MeasurableSpace β} {μ ν : Measure α}
+  {κ η : Kernel α β} {a : ℝ}
 
-/-- Rényi divergence between two kernels κ and η conditional to a measure μ.
-It is defined as `Rₐ(κ, η | μ) := Rₐ(μ ⊗ₘ κ, μ ⊗ₘ η)`. -/
+/-- The Rényi divergence of order `a` between the kernels `κ` and `η` conditional to the measure
+`μ`, defined as `Rₐ(κ, η | μ) := Rₐ(μ ⊗ₘ κ, μ ⊗ₘ η)`.
+
+Unlike the conditional f-divergences, it is not the integral of `renyiDiv a (κ x) (η x)` with
+respect to `μ`. Its finiteness is characterized in terms of the kernels by
+`condRenyiDiv_eq_top_iff_of_one_lt` and `condRenyiDiv_eq_top_iff_of_lt_one`. -/
 noncomputable
 def condRenyiDiv (a : ℝ) (κ η : Kernel α β) (μ : Measure α) : ℝ≥0∞ :=
   renyiDiv a (μ ⊗ₘ κ) (μ ⊗ₘ η)
@@ -48,11 +53,18 @@ lemma condRenyiDiv_zero (κ η : Kernel α β) (μ : Measure α) [IsMarkovKernel
   rw [condRenyiDiv, renyiDiv_zero, Measure.compProd_apply_univ]
 
 @[simp]
-lemma condRenyiDiv_one [CountableOrCountablyGenerated α β] (κ η : Kernel α β) (μ : Measure α)
+lemma condRenyiDiv_one (κ η : Kernel α β) (μ : Measure α)
     [IsMarkovKernel κ] [IsMarkovKernel η] [IsFiniteMeasure μ] [NeZero μ] :
     condRenyiDiv 1 κ η μ = (μ .univ)⁻¹ * condKL κ η μ := by
   rw [condRenyiDiv, renyiDiv_one, Measure.compProd_apply_univ, Measure.compProd_apply_univ,
-    klDiv_smul_same' (ENNReal.inv_ne_top.mpr (NeZero.ne _)), klDiv_compProd_eq_condKL]
+    klDiv_smul_same' (ENNReal.inv_ne_top.mpr (NeZero.ne _)), ← condKL]
+
+/-- The conditional Rényi divergence is invariant under scaling of the measure. -/
+lemma condRenyiDiv_smul_measure (ha : 0 ≤ a) (κ η : Kernel α β) [IsFiniteKernel κ]
+    [IsFiniteKernel η] (μ : Measure α) [IsFiniteMeasure μ] {c : ℝ≥0∞} (hc0 : c ≠ 0) (hc : c ≠ ∞) :
+    condRenyiDiv a κ η (c • μ) = condRenyiDiv a κ η μ := by
+  rw [condRenyiDiv, condRenyiDiv, Measure.compProd_smul_left, Measure.compProd_smul_left,
+    renyiDiv_smul_smul ha hc0 hc hc0 hc]
 
 lemma integrable_rpow_rnDeriv_compProd_right_iff [CountableOrCountablyGenerated α β]
     (ha_pos : 0 < a) (ha_ne : a ≠ 1) (κ η : Kernel α β) (μ : Measure α)
@@ -86,10 +98,6 @@ lemma condRenyiDiv_eq_top_iff_of_one_lt [CountableOrCountablyGenerated α β] (h
       ↔ ¬ (∀ᵐ x ∂μ, Integrable (fun b ↦ ((∂κ x/∂η x) b).toReal ^ a) (η x))
         ∨ ¬ Integrable (fun x ↦ ∫ b, ((∂κ x/∂η x) b).toReal ^ a ∂η x) μ
         ∨ ¬ ∀ᵐ x ∂μ, κ x ≪ η x := by
-  have : NeZero (μ ⊗ₘ κ) := by
-    refine ⟨fun h ↦ NeZero.ne μ ?_⟩
-    rw [← Measure.measure_univ_eq_zero, ← Measure.compProd_apply_univ (κ := κ), h,
-      Measure.coe_zero, Pi.zero_apply]
   rw [condRenyiDiv, renyiDiv_eq_top_iff_of_one_lt ha,
     Measure.absolutelyContinuous_compProd_right_iff]
   by_cases h_ac : ∀ᵐ x ∂μ, κ x ≪ η x
@@ -118,8 +126,6 @@ lemma condRenyiDiv_eq_top_iff_of_lt_one [CountableOrCountablyGenerated α β]
 end TopAndBounds
 
 section DataProcessingInequality
-
-variable {β : Type*} {mβ : MeasurableSpace β} {κ η : Kernel α β}
 
 lemma renyiDiv_comp_left_le (ha_pos : 0 < a) (μ : Measure α) [IsFiniteMeasure μ]
     (κ η : Kernel α β) [IsFiniteKernel κ] [IsFiniteKernel η] :

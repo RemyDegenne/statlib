@@ -8,6 +8,7 @@ module
 public import Mathlib.Probability.Distributions.Bernoulli
 public import Mathlib.Probability.Kernel.Composition.CompNotation
 public import Mathlib.MeasureTheory.Measure.Decomposition.Lebesgue
+public import Statlib.ForMathlib.MeasureTheory.Measure.Bool
 
 /-!
 # Bernoulli distribution: integrals, symmetry and the Bernoulli kernel
@@ -24,19 +25,26 @@ kernel from the unit interval which maps `p` to `Ber(x, y, p)`.
 
 * `lintegral_bernoulliMeasure`: the Lebesgue integral against `Ber(x, y, p)`.
 * `bernoulliMeasure_swap`: `Ber(y, x, σ p) = Ber(x, y, p)`.
+* `bernoulliMeasure_eq_dirac_of_dirac_eq`: if `dirac x = dirac y`, then `Ber(x, y, p) = dirac x`.
 * `eq_bernoulliMeasure_real_true`: every probability measure on `Bool` is a Bernoulli distribution.
+* `MeasureTheory.Measure.boolMeasure_ofReal_eq_bernoulliMeasure`: the prior
+  `boolMeasure (ENNReal.ofReal p) (ENNReal.ofReal (1 - p))` on `Bool` is `Ber(false, true, p)`.
+* `bernoulliMeasure_eq_smul_add_smul`: a Bernoulli distribution whose parameter is a convex
+  combination of `a` and `b` is the corresponding mixture of `Ber(x, y, a)` and `Ber(x, y, b)`.
 * `bernoulliMeasure_eq_withDensity`: for `x ≠ y` and `q ∉ {0, 1}`, `Ber(x, y, p)` has density
   `p / q` at `x` and `(1 - p) / (1 - q)` at `y` with respect to `Ber(x, y, q)`; hence
   `Ber(x, y, p) ≪ Ber(x, y, q)` (`bernoulliMeasure_absolutelyContinuous`) and the Radon-Nikodym
   derivative is that density (`rnDeriv_bernoulliMeasure`).
 * `bernoulliKernel_comp_apply_singleton_left`: for `x ≠ y`, the composition of `bernoulliKernel x y`
   with a measure `μ` on the unit interval gives mass `∫⁻ p, p ∂μ` to `x`.
+* `bernoulliKernel_comp_eq_bernoulliMeasure`: the composition of `bernoulliKernel x y` with a
+  probability measure on the unit interval with mean `p` is `Ber(x, y, p)`.
 -/
 
 @[expose] public section
 
 open MeasureTheory
-open scoped ENNReal
+open scoped ENNReal NNReal
 
 namespace unitInterval
 
@@ -46,6 +54,10 @@ lemma coe_toNNReal_eq_ofReal (p : I) : (toNNReal p : ℝ≥0∞) = ENNReal.ofRea
 lemma coe_toNNReal_symm_eq_ofReal (p : I) :
     (toNNReal (σ p) : ℝ≥0∞) = ENNReal.ofReal (1 - p) := by
   rw [coe_toNNReal_eq_ofReal, coe_symm_eq]
+
+/-- The inclusion of the unit interval in `ℝ` is integrable with respect to any finite measure. -/
+lemma integrable_coe (μ : Measure I) [IsFiniteMeasure μ] : Integrable (fun p : I ↦ (p : ℝ)) μ :=
+  .of_bound (by fun_prop) 1 (ae_of_all _ fun p ↦ by simpa [abs_of_nonneg p.2.1] using p.2.2)
 
 end unitInterval
 
@@ -57,6 +69,13 @@ variable {𝓧 : Type*} [MeasurableSpace 𝓧]
 
 lemma bernoulliMeasure_swap (x y : 𝓧) (p : I) : Ber(y, x, σ p) = Ber(x, y, p) := by
   rw [bernoulliMeasure_def, bernoulliMeasure_def, symm_symm, add_comm]
+
+/-- If no measurable set separates `x` and `y`, that is `dirac x = dirac y`, then
+`Ber(x, y, p) = dirac x`. This generalizes `bernoulliMeasure_self_eq_dirac`. -/
+lemma bernoulliMeasure_eq_dirac_of_dirac_eq {x y : 𝓧} (h : Measure.dirac x = Measure.dirac y)
+    (p : I) :
+    Ber(x, y, p) = Measure.dirac x := by
+  simp [bernoulliMeasure_def, ← h, ← add_smul]
 
 lemma lintegral_bernoulliMeasure [MeasurableSingletonClass 𝓧] (x y : 𝓧) (p : I)
     (f : 𝓧 → ℝ≥0∞) :
@@ -101,6 +120,22 @@ lemma eq_bernoulliMeasure_real_true (R : Measure Bool) [IsProbabilityMeasure R] 
       ENNReal.ofReal_toReal (measure_ne_top _ _)]
   · rw [bernoulliMeasure_apply_singleton_left (by decide)]
     exact (ENNReal.ofReal_toReal (measure_ne_top _ _)).symm
+
+/-- A Bernoulli distribution whose parameter is a convex combination of `a` and `b` is the
+corresponding mixture of Bernoulli distributions. -/
+lemma bernoulliMeasure_eq_smul_add_smul (x y : 𝓧) {a b c : I} {t : ℝ≥0} (ht : t ≤ 1)
+    (hc : (c : ℝ) = t * a + (1 - t) * b) :
+    Ber(x, y, c) = t • Ber(x, y, a) + (1 - t) • Ber(x, y, b) := by
+  have h1 : toNNReal c = t * toNNReal a + (1 - t) * toNNReal b := by
+    ext
+    simp [hc, NNReal.coe_sub ht]
+  have h2 : toNNReal (σ c) = t * toNNReal (σ a) + (1 - t) * toNNReal (σ b) := by
+    ext
+    simp only [coe_toNNReal, coe_symm_eq, hc, NNReal.coe_add, NNReal.coe_mul,
+      NNReal.coe_sub ht, NNReal.coe_one]
+    ring
+  simp only [bernoulliMeasure_def, smul_add, smul_smul, h1, h2, add_smul]
+  abel
 
 /-! ### Densities of Bernoulli distributions
 
@@ -179,11 +214,42 @@ interval is the integral of the identity. -/
 lemma bernoulliKernel_comp_real_apply_singleton_left [MeasurableSingletonClass 𝓧] {x y : 𝓧}
     (hxy : x ≠ y) (μ : Measure I) [IsFiniteMeasure μ] :
     (bernoulliKernel x y ∘ₘ μ).real {x} = ∫ p, (p : ℝ) ∂μ := by
-  have h_int : Integrable (fun p : I ↦ (p : ℝ)) μ :=
-    (integrable_const (1 : ℝ)).mono' (by fun_prop)
-      (ae_of_all _ fun p ↦ by rw [Real.norm_of_nonneg p.2.1]; exact p.2.2)
   rw [measureReal_def, bernoulliKernel_comp_apply_singleton_left hxy,
-    ← ofReal_integral_eq_lintegral_ofReal h_int (ae_of_all _ fun p ↦ p.2.1),
+    ← ofReal_integral_eq_lintegral_ofReal (integrable_coe μ) (ae_of_all _ fun p ↦ p.2.1),
     ENNReal.toReal_ofReal (integral_nonneg fun p ↦ p.2.1)]
 
+/-- The composition of `bernoulliKernel x y` with a probability measure on the unit interval with
+mean `p` is `Ber(x, y, p)`. -/
+lemma bernoulliKernel_comp_eq_bernoulliMeasure (x y : 𝓧) (μ : Measure I) [IsProbabilityMeasure μ]
+    {p : I} (hp : (p : ℝ) = ∫ q, (q : ℝ) ∂μ) :
+    bernoulliKernel x y ∘ₘ μ = Ber(x, y, p) := by
+  have h_int := integrable_coe μ
+  have h1 : ∫⁻ q, ENNReal.ofReal q ∂μ = ENNReal.ofReal p := by
+    rw [hp, ofReal_integral_eq_lintegral_ofReal h_int (ae_of_all _ fun q ↦ q.2.1)]
+  have h2 : ∫⁻ q, ENNReal.ofReal (1 - q) ∂μ = ENNReal.ofReal (1 - p) := by
+    have h_int' : Integrable (fun q : I ↦ 1 - (q : ℝ)) μ := (integrable_const 1).sub h_int
+    rw [← ofReal_integral_eq_lintegral_ofReal h_int' (ae_of_all _ fun q ↦ sub_nonneg.mpr q.2.2),
+      integral_sub (integrable_const 1) h_int, hp]
+    simp
+  ext s hs
+  rw [Measure.bind_apply hs (bernoulliKernel x y).aemeasurable]
+  simp_rw [bernoulliKernel_apply, bernoulliMeasure_def, Measure.add_apply, Measure.smul_apply,
+    ENNReal.smul_def, smul_eq_mul, coe_toNNReal_eq_ofReal, coe_symm_eq]
+  rw [lintegral_add_left (by fun_prop), lintegral_mul_const _ (by fun_prop),
+    lintegral_mul_const _ (by fun_prop), h1, h2]
+
 end ProbabilityTheory
+
+namespace MeasureTheory.Measure
+
+open ProbabilityTheory
+
+/-- The prior `boolMeasure p (1 - p)` on `Bool` is the Bernoulli distribution
+`Ber(false, true, p)`. -/
+lemma boolMeasure_ofReal_eq_bernoulliMeasure (p : I) :
+    boolMeasure (ENNReal.ofReal p) (ENNReal.ofReal (1 - p)) = Ber(false, true, p) := by
+  refine ext_bool ?_ ?_
+  · rw [boolMeasure_apply_false, bernoulliMeasure_apply_singleton_left (by decide)]
+  · rw [boolMeasure_apply_true, bernoulliMeasure_apply_singleton_right (by decide)]
+
+end MeasureTheory.Measure

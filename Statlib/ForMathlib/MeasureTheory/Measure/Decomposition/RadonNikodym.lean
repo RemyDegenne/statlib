@@ -17,6 +17,8 @@ public import Mathlib.MeasureTheory.Measure.Decomposition.RadonNikodym
 * `MeasureTheory.Measure.rnDeriv_restrict_restrict`,
   `MeasureTheory.Measure.singularPart_restrict_restrict`: Radon-Nikodym derivative and singular
   part of `μ.restrict s` with respect to `ν.restrict s`.
+* `MeasureTheory.Measure.singularPart_eq_restrict_rnDeriv_add_eq_zero`: the singular part of `μ`
+  with respect to `ν` is the restriction of `μ` to the set where `∂ν/∂(μ + ν)` vanishes.
 * `MeasureTheory.Measure.rnDeriv_eq_inv_rnDeriv_of_ne_zero`: `∂ν/∂μ = (∂μ/∂ν)⁻¹`, `ν`-almost
   everywhere on the set where `∂μ/∂ν ≠ 0`.
 * `MeasureTheory.lintegral_eq_add_singularPart_withDensity`: decomposition of `∫⁻ x, g x ∂ν` along
@@ -61,6 +63,30 @@ lemma singularPart_restrict_restrict (μ ν : Measure α) [SigmaFinite μ] [Sigm
     (((mutuallySingular_singularPart μ ν).restrict s).symm.restrict s).symm ?_).symm
   conv_lhs => rw [μ.haveLebesgueDecomposition_add ν]
   rw [restrict_add, restrict_withDensity hs]
+
+/-- The singular part of `μ` with respect to `ν` is the restriction of `μ` to the set where
+`∂ν/∂(μ + ν)` vanishes. -/
+lemma singularPart_eq_restrict_rnDeriv_add_eq_zero (μ ν : Measure α) [SigmaFinite μ]
+    [SigmaFinite ν] :
+    μ.singularPart ν = μ.restrict {x | ν.rnDeriv (μ + ν) x = 0} := by
+  set N := {x | ν.rnDeriv (μ + ν) x = 0}
+  have hN : MeasurableSet N := measurableSet_eq_fun (ν.measurable_rnDeriv _) measurable_const
+  have hνρ : ν ≪ μ + ν := AbsolutelyContinuous.rfl.add_right' μ
+  have hνN : ν N = 0 := by
+    rw [← setLIntegral_rnDeriv hνρ, setLIntegral_congr_fun hN (g := 0) fun x hx ↦ hx]
+    simp
+  -- outside of `N`, `μ` is absolutely continuous with respect to `ν`
+  have h_ac : μ.restrict Nᶜ ≪ ν := by
+    refine AbsolutelyContinuous.mk fun s hs hνs ↦ ?_
+    rw [restrict_apply hs]
+    refine AbsolutelyContinuous.rfl.add_right ν ?_
+    rw [← setLIntegral_rnDeriv hνρ, setLIntegral_eq_zero_iff hs (ν.measurable_rnDeriv _)] at hνs
+    rw [← compl_compl (s ∩ Nᶜ), ← mem_ae_iff]
+    filter_upwards [hνs] with x hx hxN
+    exact hxN.2 (hx hxN.1)
+  refine singularPart_eq_restrict ?_ hνN
+  rw [← restrict_apply_univ, ← singularPart_restrict μ ν hN.compl, singularPart_eq_zero_of_ac h_ac,
+    coe_zero, Pi.zero_apply]
 
 /-- On the set where `∂μ/∂ν` does not vanish, `∂ν/∂μ` is its inverse, `ν`-almost everywhere. -/
 lemma rnDeriv_eq_inv_rnDeriv_of_ne_zero (μ ν : Measure α) [SigmaFinite μ] [SigmaFinite ν] :

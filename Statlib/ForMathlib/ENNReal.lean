@@ -74,6 +74,10 @@ lemma inv_div_fsupport {α : Type*} (f g : α → ℝ≥0∞) :
 lemma log_div (a b : ℝ≥0∞) : ENNReal.log (a / b) = ENNReal.log a - ENNReal.log b := by
   simp_rw [div_eq_mul_inv, ENNReal.log_mul_add, ENNReal.log_inv, sub_eq_add_neg]
 
+/-- An extended nonnegative real number bounded by `1` gives an element of the unit interval. -/
+lemma toReal_mem_unitInterval {r : ℝ≥0∞} (hr : r ≤ 1) : r.toReal ∈ unitInterval :=
+  ⟨ENNReal.toReal_nonneg, ENNReal.toReal_le_of_le_ofReal zero_le_one (by simpa using hr)⟩
+
 section Ioo
 
 open Set

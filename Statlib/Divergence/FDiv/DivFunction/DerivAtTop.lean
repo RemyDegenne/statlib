@@ -14,6 +14,9 @@ public import Statlib.Divergence.FDiv.DivFunction.Basic
 
 * `DivFunction.derivAtTop`: the limit of `f y / y` as `y → ∞`, an element of `ℝ≥0∞`. It is defined
   as a `limsup`, so that it is always defined.
+* `DivFunction.mixtureFun`: the function `p ↦ (1 - p) * f (p / (1 - p))` on `[0, 1)`, extended by
+  `f.derivAtTop` on `[1, ∞]`. If `p = ∂μ/∂(μ + ν)`, then
+  `fDiv f μ ν = ∫⁻ x, f.mixtureFun (p x) ∂(μ + ν)` (`fDiv_eq_lintegral_mixtureFun`).
 
 ## Main statements
 
@@ -22,6 +25,7 @@ public import Statlib.Divergence.FDiv.DivFunction.Basic
 * `DivFunction.le_add_derivAtTop`: for `y ≤ x`, `f x ≤ f y + f.derivAtTop * (x - y)`.
 * `DivFunction.derivAtTop_add`, `DivFunction.derivAtTop_smul`, `DivFunction.derivAtTop_mono`:
   behavior under addition, scalar multiplication and pointwise order.
+* `DivFunction.continuous_mixtureFun`: `f.mixtureFun` is continuous.
 
 ## Implementation details
 
@@ -219,5 +223,69 @@ lemma lintegral_comp_rnDeriv_ne_top (μ ν : Measure α) [IsFiniteMeasure μ]
   exact ENNReal.add_ne_top.mpr ⟨ENNReal.mul_ne_top hf_zero (measure_ne_top _ _),
     ENNReal.mul_ne_top hf_deriv (ne_top_of_le_ne_top (measure_ne_top μ _)
       Measure.lintegral_rnDeriv_le)⟩
+
+section MixtureFun
+
+/-- The function `p ↦ (1 - p) * f (p / (1 - p))` on `[0, 1)`, extended by `f.derivAtTop` on
+`[1, ∞]`. If `p = ∂μ/∂(μ + ν)`, then `1 - p = ∂ν/∂(μ + ν)` and
+`fDiv f μ ν = ∫⁻ x, f.mixtureFun (p x) ∂(μ + ν)` (see `fDiv_eq_lintegral_mixtureFun`). It is
+continuous (`continuous_mixtureFun`). -/
+noncomputable def mixtureFun (f : DivFunction) (p : ℝ≥0∞) : ℝ≥0∞ :=
+  if p < 1 then (1 - p) * f (p / (1 - p)) else f.derivAtTop
+
+lemma mixtureFun_of_lt_one {p : ℝ≥0∞} (hp : p < 1) :
+    f.mixtureFun p = (1 - p) * f (p / (1 - p)) := ite_eq_left hp
+
+lemma mixtureFun_of_one_le {p : ℝ≥0∞} (hp : 1 ≤ p) : f.mixtureFun p = f.derivAtTop :=
+  ite_eq_right hp.not_gt
+
+/-- `f.mixtureFun` is continuous. At `1`, this is the convergence of `f y / y` to `f.derivAtTop`
+as `y → ∞`. -/
+lemma continuous_mixtureFun (f : DivFunction) : Continuous f.mixtureFun := by
+  have h_sub : Continuous fun q : ℝ≥0∞ ↦ 1 - q := ENNReal.continuous_sub_left ENNReal.one_ne_top
+  refine continuous_iff_continuousAt.2 fun p ↦ ?_
+  rcases lt_trichotomy p 1 with hp | rfl | hp
+  · -- on `[0, 1)`, `f.mixtureFun` is given by a continuous formula
+    have h_eq : (fun q ↦ (1 - q) * f (q / (1 - q))) =ᶠ[𝓝 p] f.mixtureFun :=
+      eventuallyEq_of_mem (Iio_mem_nhds hp) fun q hq ↦ (mixtureFun_of_lt_one hq).symm
+    refine ContinuousAt.congr ?_ h_eq
+    have h1 : (1 : ℝ≥0∞) - p ≠ 0 := (tsub_pos_of_lt hp).ne'
+    refine ENNReal.Tendsto.mul (h_sub.tendsto p) (Or.inl h1) ?_ (Or.inr (by simp))
+    exact (f.continuous.tendsto _).comp
+      (ENNReal.Tendsto.div tendsto_id (Or.inr h1) (h_sub.tendsto p) (Or.inl (by simp)))
+  swap
+  · -- on `(1, ∞]`, `f.mixtureFun` is constant
+    exact continuousAt_const.congr
+      (eventuallyEq_of_mem (Ioi_mem_nhds hp) fun q hq ↦ (mixtureFun_of_one_le hq.le).symm)
+  -- at `1`, `f.mixtureFun` is constant on the right, and we compute the limit on the left
+  rw [ContinuousAt, mixtureFun_of_one_le le_rfl, ← nhdsLT_sup_nhdsGE (1 : ℝ≥0∞), tendsto_sup]
+  refine ⟨?_, tendsto_const_nhds.congr'
+    (eventuallyEq_of_mem self_mem_nhdsWithin fun q hq ↦ (mixtureFun_of_one_le hq).symm)⟩
+  have h_div : Tendsto (fun q : ℝ≥0∞ ↦ q / (1 - q)) (𝓝[<] 1) (𝓝[<] ∞) := by
+    refine tendsto_nhdsWithin_iff.2 ⟨?_, ?_⟩
+    · have h0 : Tendsto (fun q : ℝ≥0∞ ↦ 1 - q) (𝓝[<] 1) (𝓝 0) := by
+        simpa using (h_sub.tendsto 1).mono_left nhdsWithin_le_nhds
+      simpa [ENNReal.div_zero] using ENNReal.Tendsto.div
+        (tendsto_nhdsWithin_of_tendsto_nhds tendsto_id) (Or.inl one_ne_zero) h0
+        (Or.inr ENNReal.one_ne_top)
+    · filter_upwards [self_mem_nhdsWithin] with q hq
+      exact ENNReal.div_lt_top (hq.trans ENNReal.one_lt_top).ne (tsub_pos_of_lt hq).ne'
+  have h_lim : Tendsto (fun q : ℝ≥0∞ ↦ q * (f (q / (1 - q)) / (q / (1 - q)))) (𝓝[<] 1)
+      (𝓝 (1 * f.derivAtTop)) :=
+    ENNReal.Tendsto.mul (tendsto_nhdsWithin_of_tendsto_nhds tendsto_id) (Or.inl one_ne_zero)
+      (f.tendsto_div_nhdsLT_top.comp h_div) (Or.inr ENNReal.one_ne_top)
+  rw [one_mul] at h_lim
+  refine h_lim.congr' ?_
+  filter_upwards [Ioo_mem_nhdsLT (zero_lt_one' ℝ≥0∞)] with q hq
+  have h1q : (1 : ℝ≥0∞) - q ≠ 0 := (tsub_pos_of_lt hq.2).ne'
+  have h1q_top : (1 : ℝ≥0∞) - q ≠ ∞ := ENNReal.sub_ne_top ENNReal.one_ne_top
+  rw [mixtureFun_of_lt_one hq.2, div_eq_mul_inv (f _),
+    ENNReal.inv_div (Or.inl h1q_top) (Or.inl h1q), mul_left_comm,
+    ENNReal.mul_div_cancel hq.1.ne' (hq.2.trans ENNReal.one_lt_top).ne, mul_comm]
+
+lemma measurable_mixtureFun (f : DivFunction) : Measurable f.mixtureFun :=
+  f.continuous_mixtureFun.measurable
+
+end MixtureFun
 
 end ProbabilityTheory.DivFunction

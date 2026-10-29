@@ -20,6 +20,9 @@ public import Statlib.Divergence.Hellinger.HellingerFun
 * `hellingerDivFun_one`: `hellingerDivFun 1 = klDivFun`.
 * `derivAtTop_hellingerDivFun_of_one_le`, `derivAtTop_hellingerDivFun_of_lt_one`: the derivative
   at infinity is `∞` for `1 ≤ a` and `a / (1 - a)` for `a < 1`.
+* `conj_hellingerDivFun_ofReal`: the conjugate of `hellingerDivFun a` is
+  `u ↦ (u ^ (1 - a) - u - a * (1 - u)) / (a - 1)` on `(0, ∞)`.
+* `conj_hellingerDivFun_inv_two`: `hellingerDivFun 2⁻¹` is self-conjugate.
 
 This file is adapted from the testing-lower-bounds project of Rémy Degenne and Lorenzo Luccioli
 (https://github.com/RemyDegenne/testing-lower-bounds).
@@ -151,5 +154,30 @@ lemma lintegral_hellingerDivFun_of_pos_of_ne_one_of_integrable_of_ac
         + (ν .univ).toReal + (1 - a)⁻¹ * a * (μ univ).toReal) := by
   rw [lintegral_hellingerDivFun_of_pos_of_ne_one_of_integrable ha_pos ha_ne h_int,
     Measure.integral_toReal_rnDeriv hμν, measureReal_def]
+
+/-- The conjugate `u ↦ u * f (1 / u)` of `f = hellingerDivFun a` is
+`u ↦ (u ^ (1 - a) - u - a * (1 - u)) / (a - 1)` on `(0, ∞)`. -/
+lemma conj_hellingerDivFun_ofReal (ha_pos : 0 < a) (ha_ne : a ≠ 1) {u : ℝ} (hu : 0 < u) :
+    (hellingerDivFun a).conj (ENNReal.ofReal u)
+      = ENNReal.ofReal ((a - 1)⁻¹ * (u ^ (1 - a) - u - a * (1 - u))) := by
+  have hu0 : ENNReal.ofReal u ≠ 0 := by simpa using hu
+  rw [DivFunction.conj_of_ne_zero hu0, hellingerDivFun_apply_of_pos_of_ne_one ha_pos ha_ne
+    (ENNReal.inv_ne_top.mpr hu0), ENNReal.toReal_inv, ENNReal.toReal_ofReal hu.le,
+    ← ENNReal.ofReal_mul hu.le]
+  congr 1
+  have h1 : u * u⁻¹ ^ a = u ^ (1 - a) := by
+    rw [Real.inv_rpow hu.le, Real.rpow_sub hu, Real.rpow_one, div_eq_mul_inv]
+  have h2 : u * u⁻¹ = 1 := mul_inv_cancel₀ hu.ne'
+  linear_combination (a - 1)⁻¹ * h1 - a * (a - 1)⁻¹ * h2
+
+/-- The divergence function of order `2⁻¹` is self-conjugate. -/
+lemma conj_hellingerDivFun_inv_two : (hellingerDivFun 2⁻¹).conj = hellingerDivFun 2⁻¹ := by
+  refine DivFunction.eq_of_forall_ne_zero_ne_top fun x hx0 hx_top ↦ ?_
+  have hx : 0 < x.toReal := ENNReal.toReal_pos hx0 hx_top
+  rw [← ENNReal.ofReal_toReal hx_top, conj_hellingerDivFun_ofReal (by norm_num) (by norm_num) hx,
+    hellingerDivFun_apply_of_pos_of_ne_one (by norm_num) (by norm_num) ENNReal.ofReal_ne_top,
+    ENNReal.toReal_ofReal hx.le]
+  norm_num
+  ring_nf
 
 end ProbabilityTheory

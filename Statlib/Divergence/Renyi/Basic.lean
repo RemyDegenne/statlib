@@ -10,6 +10,8 @@ public import Statlib.ForMathlib.InformationTheory.KullbackLeibler.Basic
 public import Mathlib.Probability.Moments.Basic
 public import Mathlib.Basic.Real.Sign
 public import Mathlib.Analysis.SpecialFunctions.Log.ENNRealLog
+public import Mathlib.Analysis.SpecialFunctions.Log.ERealExp
+public import Statlib.ForMathlib.MeasureTheory.Measure.Bool
 
 /-!
 # Rényi divergence
@@ -24,10 +26,19 @@ public import Mathlib.Analysis.SpecialFunctions.Log.ENNRealLog
 ## Main statements
 
 * `renyiDiv_zero`, `renyiDiv_one`: the special cases.
+* `renyiDiv_self`: `Rₐ(μ, μ) = 0` for a nonzero finite measure `μ` and every order `a`.
 * `renyiDiv_smul_left`, `renyiDiv_smul_right`: invariance under scaling of the measures.
 * `renyiDiv_eq_top_iff_mutuallySingular_of_lt_one`: for `a < 1`, the divergence is infinite iff the
   measures are mutually singular.
-* `renyiDiv_comp_le_compProd`, `renyiDiv_comp_right_le`: data-processing inequalities.
+* `toReal_renyiDiv_of_ne_top`: for finite measures with `μ ≠ 0`, if `Rₐ(μ, ν) < ∞`, then
+  `Rₐ(μ, ν) = (a - 1)⁻¹ * (log ∫ (∂μ/∂ν) ^ a ∂ν - (a * log μ(α) + (1 - a) * log ν(α)))`;
+  `toReal_renyiDiv_of_ne_top_of_isProbabilityMeasure`: for probability measures,
+  `Rₐ(μ, ν) = (a - 1)⁻¹ * log ∫ (∂μ/∂ν) ^ a ∂ν`.
+* `lintegral_rpow_rnDeriv_eq_mul_exp_renyiDiv`: for `a ∈ (0, 1)` and finite measures,
+  `∫⁻ x, (∂μ/∂ν) x ^ a ∂ν = μ(univ) ^ a * ν(univ) ^ (1 - a) * exp (-(1 - a) * Rₐ(μ, ν))`.
+* `le_renyiDiv_of_le_hellingerDiv`: for `a > 0` and measures with the same masses, an inequality
+  between Hellinger divergences of order `a` gives the same inequality between Rényi divergences.
+  The data-processing inequalities are deduced from it in `Statlib.Divergence.Renyi.DataProcessing`.
 
 This file is adapted from the testing-lower-bounds project of Rémy Degenne and Lorenzo Luccioli
 (https://github.com/RemyDegenne/testing-lower-bounds).
@@ -188,6 +199,15 @@ lemma renyiDiv_of_ne_one (ha_zero : a ≠ 0) (ha_ne_one : a ≠ 1) (μ ν : Meas
       - (a - 1)⁻¹ * (a * Real.log (μ .univ).toReal
         + (1 - a) * Real.log (ν .univ).toReal)).toENNReal := by
   rw [renyiDiv, ite_eq_right ha_zero, ite_eq_right ha_ne_one]
+
+/-- The Rényi divergence of order `a ∉ {0, 1}` between probability measures, as a function of the
+Hellinger divergence: `Rₐ(μ, ν) = (a - 1)⁻¹ * log (1 + (a - 1) * Hₐ(μ, ν))`. -/
+lemma renyiDiv_of_ne_one_of_isProbabilityMeasure (ha0 : a ≠ 0) (ha1 : a ≠ 1) (μ ν : Measure α)
+    [IsProbabilityMeasure μ] [IsProbabilityMeasure ν] :
+    renyiDiv a μ ν = (((a - 1)⁻¹ : ℝ) * ENNReal.log
+      ((1 + ((a - 1 : ℝ) : EReal) * hellingerDiv a μ ν).toENNReal) : EReal).toENNReal := by
+  rw [renyiDiv_of_ne_one ha0 ha1]
+  simp [avgMass, EReal.coe_sub]
 
 lemma renyiDiv_eq_top_of_hellingerDiv_eq_top [NeZero μ] [IsFiniteMeasure μ] [IsFiniteMeasure ν]
     (h : hellingerDiv a μ ν = ∞) :
@@ -408,6 +428,25 @@ lemma renyiDiv_zero_measure_right (ha_nonneg : 0 ≤ a)
     norm_cast
     exact EReal.coe_ne_top _
 
+/-- The Rényi divergence between a nonzero finite measure and itself is zero. -/
+@[simp]
+lemma renyiDiv_self (μ : Measure α) [IsFiniteMeasure μ] [NeZero μ] : renyiDiv a μ μ = 0 := by
+  rcases eq_or_ne a 0 with rfl | ha0
+  · have h : μ {x | 0 < (∂μ/∂μ) x} = μ .univ :=
+      (ae_iff_measure_eq (measurableSet_lt measurable_const
+        (μ.measurable_rnDeriv μ)).nullMeasurableSet).mp (Measure.rnDeriv_pos .rfl)
+    simp [renyiDiv_zero, h, ENNReal.div_self (NeZero.ne _) (measure_ne_top _ _)]
+  rcases eq_or_ne a 1 with rfl | ha1
+  · rw [renyiDiv_one, klDiv_self]
+  -- for `a ∉ {0, 1}`, `Hₐ(μ, μ) = 0` and both terms of the definition are `log μ(univ) / (a - 1)`
+  have hm : 0 < (μ .univ).toReal :=
+    ENNReal.toReal_pos (Measure.measure_univ_ne_zero.mpr (NeZero.ne μ)) (measure_ne_top _ _)
+  rw [renyiDiv_of_ne_one ha0 ha1, hellingerDiv_self, EReal.coe_ennreal_zero, mul_zero, add_zero,
+    show avgMass a μ μ = (μ .univ).toReal by ring, EReal.real_coe_toENNReal,
+    ENNReal.log_ofReal_of_pos hm]
+  norm_cast
+  simp [← add_mul]
+
 section RenyiEq
 
 lemma renyiDiv_eq_top_iff_hellingerDiv_eq_top_of_one_lt
@@ -482,6 +521,107 @@ lemma absolutelyContinuous_of_renyiDiv_ne_top (ha : 1 ≤ a) (h : renyiDiv a μ 
   exact h (renyiDiv_of_one_le_of_not_ac ha h_ac)
 
 end RenyiEq
+
+section HellingerIntegral
+
+/-! ### The Rényi divergence and the Hellinger integral `∫ (∂μ/∂ν) ^ a ∂ν` -/
+
+/-- For finite measures with `μ ≠ 0` and finite Rényi divergence of order
+`a ∈ (0, 1) ∪ (1, ∞)`,
+`Rₐ(μ, ν) = (a - 1)⁻¹ * (log ∫ (∂μ/∂ν) ^ a ∂ν - (a * log μ(α) + (1 - a) * log ν(α)))`. -/
+lemma toReal_renyiDiv_of_ne_top [NeZero μ] [IsFiniteMeasure μ] [IsFiniteMeasure ν] (ha0 : 0 < a)
+    (ha1 : a ≠ 1) (h : renyiDiv a μ ν ≠ ∞) :
+    (renyiDiv a μ ν).toReal
+      = (a - 1)⁻¹ * (log (∫ x, ((∂μ/∂ν) x).toReal ^ a ∂ν)
+        - (a * log (μ .univ).toReal + (1 - a) * log (ν .univ).toReal)) := by
+  rcases ha1.lt_or_gt with ha1 | ha1
+  · exact toReal_renyiDiv_of_lt_one ha0 ha1
+      ((renyiDiv_eq_top_iff_mutuallySingular_of_lt_one ha0.le ha1).not.mp h)
+  · obtain ⟨h_int, h_ac⟩ := (renyiDiv_ne_top_iff_of_one_lt ha1).mp h
+    exact toReal_renyiDiv_of_one_lt ha1 h_int h_ac
+
+/-- For probability measures with finite Rényi divergence of order `a ∈ (0, 1) ∪ (1, ∞)`,
+`Rₐ(μ, ν) = (a - 1)⁻¹ * log ∫ (∂μ/∂ν) ^ a ∂ν`. -/
+lemma toReal_renyiDiv_of_ne_top_of_isProbabilityMeasure [IsProbabilityMeasure μ]
+    [IsProbabilityMeasure ν] (ha0 : 0 < a) (ha1 : a ≠ 1) (h : renyiDiv a μ ν ≠ ∞) :
+    (renyiDiv a μ ν).toReal = (a - 1)⁻¹ * log (∫ x, ((∂μ/∂ν) x).toReal ^ a ∂ν) := by
+  simp [toReal_renyiDiv_of_ne_top ha0 ha1 h]
+
+/-- For finite measures and `a ≥ 0`, if `Rₐ(μ, ν) < ∞`, then `(∂μ/∂ν) ^ a` is `ν`-integrable. -/
+lemma integrable_rpow_rnDeriv_of_renyiDiv_ne_top [IsFiniteMeasure μ] [IsFiniteMeasure ν]
+    (ha : 0 ≤ a) (h : renyiDiv a μ ν ≠ ∞) :
+    Integrable (fun x ↦ ((∂μ/∂ν) x).toReal ^ a) ν := by
+  rcases lt_or_ge a 1 with ha1 | ha1
+  · exact integrable_rpow_rnDeriv_of_lt_one ha ha1
+  rcases ha1.eq_or_lt with rfl | ha1
+  · simpa using Measure.integrable_toReal_rnDeriv
+  rcases eq_zero_or_neZero μ with rfl | hμ
+  · refine (integrable_zero α ℝ ν).congr ?_
+    filter_upwards [ν.rnDeriv_zero] with x hx
+    simp [hx, Real.zero_rpow (by linarith : a ≠ 0)]
+  exact ((renyiDiv_ne_top_iff_of_one_lt ha1).mp h).1
+
+/-- For finite measures with `μ ≠ 0` and finite Rényi divergence of order `a > 0`, the Hellinger
+integral `∫ (∂μ/∂ν) ^ a ∂ν` is positive. -/
+lemma integral_rpow_rnDeriv_pos_of_renyiDiv_ne_top [IsFiniteMeasure μ] [NeZero μ]
+    [IsFiniteMeasure ν] (ha : 0 < a) (h : renyiDiv a μ ν ≠ ∞) :
+    0 < ∫ x, ((∂μ/∂ν) x).toReal ^ a ∂ν :=
+  (integral_rpow_rnDeriv_pos_iff_not_mutuallySingular ha.ne'
+    (integrable_rpow_rnDeriv_of_renyiDiv_ne_top ha.le h)).mpr
+      fun h_ms ↦ h (renyiDiv_of_mutuallySingular ha.le h_ms)
+
+/-- For `a ∈ (0, 1)` and finite measures, `∫⁻ x, (∂μ/∂ν) x ^ a ∂ν` is
+`μ(univ) ^ a * ν(univ) ^ (1 - a) * exp (-(1 - a) * Rₐ(μ, ν))`. Both sides vanish when the
+measures are mutually singular. -/
+lemma lintegral_rpow_rnDeriv_eq_mul_exp_renyiDiv [IsFiniteMeasure μ] [IsFiniteMeasure ν]
+    (ha0 : 0 < a) (ha1 : a < 1) :
+    ∫⁻ x, (∂μ/∂ν) x ^ a ∂ν
+      = μ .univ ^ a * ν .univ ^ (1 - a)
+        * EReal.exp (-(((1 - a : ℝ) : EReal) * renyiDiv a μ ν)) := by
+  by_cases h_ms : μ ⟂ₘ ν
+  · rw [(lintegral_rpow_rnDeriv_eq_zero_iff_mutuallySingular ha0).mpr h_ms,
+      (renyiDiv_eq_top_iff_mutuallySingular_of_lt_one ha0.le ha1).mpr h_ms, EReal.coe_ennreal_top,
+      EReal.coe_mul_top_of_pos (by simpa using ha1), EReal.neg_top, EReal.exp_bot, mul_zero]
+  have hμ : μ ≠ 0 := fun h ↦ h_ms (h ▸ Measure.MutuallySingular.zero_left)
+  have hν : ν ≠ 0 := fun h ↦ h_ms (h ▸ Measure.MutuallySingular.zero_right)
+  have hμ_pos : 0 < (μ .univ).toReal :=
+    ENNReal.toReal_pos (Measure.measure_univ_ne_zero.mpr hμ) (measure_ne_top _ _)
+  have hν_pos : 0 < (ν .univ).toReal :=
+    ENNReal.toReal_pos (Measure.measure_univ_ne_zero.mpr hν) (measure_ne_top _ _)
+  have h_int := integrable_rpow_rnDeriv_of_lt_one ha0.le ha1 (μ := μ) (ν := ν)
+  have h_pos : 0 < ∫ x, (μ.rnDeriv ν x).toReal ^ a ∂ν :=
+    (integral_rpow_rnDeriv_pos_iff_not_mutuallySingular ha0.ne' h_int).mpr h_ms
+  have h_ne_top : renyiDiv a μ ν ≠ ∞ :=
+    fun h ↦ h_ms ((renyiDiv_eq_top_iff_mutuallySingular_of_lt_one ha0.le ha1).mp h)
+  -- the lintegral is the `ofReal` of the integral
+  have h_lint : ∫⁻ x, (∂μ/∂ν) x ^ a ∂ν = ENNReal.ofReal (∫ x, (μ.rnDeriv ν x).toReal ^ a ∂ν) := by
+    rw [integral_rpow_rnDeriv_eq_toReal_lintegral ha0.le,
+      ENNReal.ofReal_toReal ((integrable_rpow_rnDeriv_iff_lintegral_ne_top ha0.le).mp h_int)]
+  -- the integral in terms of the Rényi divergence
+  have h_renyi := toReal_renyiDiv_of_lt_one ha0 ha1 h_ms
+  have h_log : Real.log (∫ x, (μ.rnDeriv ν x).toReal ^ a ∂ν)
+      = -(1 - a) * (renyiDiv a μ ν).toReal + a * Real.log (μ .univ).toReal
+        + (1 - a) * Real.log (ν .univ).toReal := by
+    rw [h_renyi]
+    have : a - 1 ≠ 0 := by linarith
+    field_simp
+    ring
+  have h_eq : ∫ x, (μ.rnDeriv ν x).toReal ^ a ∂ν
+      = (μ .univ).toReal ^ a * (ν .univ).toReal ^ (1 - a)
+        * Real.exp (-(1 - a) * (renyiDiv a μ ν).toReal) := by
+    rw [← Real.exp_log h_pos, h_log, Real.rpow_def_of_pos hμ_pos, Real.rpow_def_of_pos hν_pos,
+      ← Real.exp_add, ← Real.exp_add]
+    ring_nf
+  have h_exp : EReal.exp (-(((1 - a : ℝ) : EReal) * renyiDiv a μ ν))
+      = ENNReal.ofReal (Real.exp (-(1 - a) * (renyiDiv a μ ν).toReal)) := by
+    rw [← EReal.coe_ennreal_toReal h_ne_top, ← EReal.coe_mul, ← EReal.coe_neg, EReal.exp_coe,
+      neg_mul]
+  rw [h_lint, h_eq, h_exp, ENNReal.ofReal_mul (by positivity), ENNReal.ofReal_mul (by positivity),
+    ← ENNReal.ofReal_rpow_of_nonneg ENNReal.toReal_nonneg ha0.le,
+    ← ENNReal.ofReal_rpow_of_nonneg ENNReal.toReal_nonneg (by linarith),
+    ENNReal.ofReal_toReal (measure_ne_top _ _), ENNReal.ofReal_toReal (measure_ne_top _ _)]
+
+end HellingerIntegral
 
 lemma toReal_renyiDiv_symm (ha_pos : 0 < a) (ha_lt : a < 1)
     [IsFiniteMeasure μ] [IsFiniteMeasure ν] :
@@ -686,10 +826,20 @@ lemma renyiDiv_smul_smul (ha_nonneg : 0 ≤ a) [IsFiniteMeasure μ] [IsFiniteMea
 
 /-- The Rényi divergence between finite measures is the Rényi divergence between the normalized
 measures. -/
-lemma renyiDiv_eq_renyiDiv_inv_smul (ha_nonneg : 0 ≤ a) [IsFiniteMeasure μ] [IsFiniteMeasure ν]
-    [NeZero μ] [NeZero ν] :
-    renyiDiv a μ ν = renyiDiv a ((μ .univ)⁻¹ • μ) ((ν .univ)⁻¹ • ν) :=
-  (renyiDiv_smul_smul ha_nonneg (ENNReal.inv_ne_zero.mpr (measure_ne_top _ _))
+lemma renyiDiv_eq_renyiDiv_inv_smul (ha_nonneg : 0 ≤ a) [IsFiniteMeasure μ] [IsFiniteMeasure ν] :
+    renyiDiv a μ ν = renyiDiv a ((μ .univ)⁻¹ • μ) ((ν .univ)⁻¹ • ν) := by
+  rcases eq_zero_or_neZero ν with rfl | _
+  · rcases eq_zero_or_neZero μ with rfl | _
+    · simp
+    have := μ.smul_finite (ENNReal.inv_ne_top.mpr (NeZero.ne (μ .univ)))
+    have : NeZero ((μ .univ)⁻¹ • μ) := ⟨by simp [NeZero.ne μ, measure_ne_top]⟩
+    simp only [smul_zero, renyiDiv_zero_measure_right ha_nonneg]
+  rcases eq_zero_or_neZero μ with rfl | _
+  · have := ν.smul_finite (ENNReal.inv_ne_top.mpr (NeZero.ne (ν .univ)))
+    rcases eq_or_ne a 1 with rfl | ha1
+    · simp [renyiDiv_one]
+    · simp only [smul_zero, renyiDiv_zero_measure_left ha_nonneg ha1]
+  exact (renyiDiv_smul_smul ha_nonneg (ENNReal.inv_ne_zero.mpr (measure_ne_top _ _))
     (ENNReal.inv_ne_top.mpr (NeZero.ne _)) (ENNReal.inv_ne_zero.mpr (measure_ne_top _ _))
     (ENNReal.inv_ne_top.mpr (NeZero.ne _))).symm
 
@@ -738,8 +888,8 @@ end CGF
 
 section DataProcessingInequality
 
-variable {β : Type*} {mβ : MeasurableSpace β} {κ η : Kernel α β}
-
+/-- For `a > 0` and measures with the same masses, an inequality between Hellinger divergences of
+order `a` gives the same inequality between Rényi divergences of order `a`. -/
 lemma le_renyiDiv_of_le_hellingerDiv {a : ℝ} {μ₁ ν₁ : Measure α} {μ₂ ν₂ : Measure β}
     [IsFiniteMeasure μ₁] [IsFiniteMeasure ν₁] [IsFiniteMeasure μ₂] [IsFiniteMeasure ν₂]
     (ha_pos : 0 < a) (h_eq_μ : μ₁ .univ = μ₂ .univ)
@@ -766,38 +916,6 @@ lemma le_renyiDiv_of_le_hellingerDiv {a : ℝ} {μ₁ ν₁ : Measure α} {μ₂
     gcongr
     norm_cast
     linarith
-
-lemma le_renyiDiv_compProd (ha_pos : 0 < a)
-    (μ ν : Measure α) [IsFiniteMeasure μ] [IsFiniteMeasure ν]
-    (κ η : Kernel α β) [IsMarkovKernel κ] [IsMarkovKernel η] :
-    renyiDiv a μ ν ≤ renyiDiv a (μ ⊗ₘ κ) (ν ⊗ₘ η) :=
-  le_renyiDiv_of_le_hellingerDiv ha_pos Measure.compProd_apply_univ.symm
-    Measure.compProd_apply_univ.symm (le_hellingerDiv_compProd μ ν κ η)
-
-lemma renyiDiv_fst_le (ha_pos : 0 < a)
-    (μ ν : Measure (α × β)) [IsFiniteMeasure μ] [IsFiniteMeasure ν] :
-    renyiDiv a μ.fst ν.fst ≤ renyiDiv a μ ν :=
-  le_renyiDiv_of_le_hellingerDiv ha_pos Measure.fst_univ Measure.fst_univ (hellingerDiv_fst_le μ ν)
-
-lemma renyiDiv_snd_le (ha_pos : 0 < a)
-    (μ ν : Measure (α × β)) [IsFiniteMeasure μ] [IsFiniteMeasure ν] :
-    renyiDiv a μ.snd ν.snd ≤ renyiDiv a μ ν :=
-  le_renyiDiv_of_le_hellingerDiv ha_pos Measure.snd_univ Measure.snd_univ (hellingerDiv_snd_le μ ν)
-
-lemma renyiDiv_comp_le_compProd (ha_pos : 0 < a)
-    (μ ν : Measure α) [IsFiniteMeasure μ] [IsFiniteMeasure ν]
-    (κ η : Kernel α β) [IsFiniteKernel κ] [IsFiniteKernel η] :
-    renyiDiv a (κ ∘ₘ μ) (η ∘ₘ ν) ≤ renyiDiv a (μ ⊗ₘ κ) (ν ⊗ₘ η) :=
-  le_renyiDiv_of_le_hellingerDiv ha_pos (Measure.snd_compProd μ κ ▸ Measure.snd_univ)
-    (Measure.snd_compProd ν η ▸ Measure.snd_univ) (hellingerDiv_comp_le_compProd μ ν κ η)
-
-/-- The Data Processing Inequality for the Renyi divergence. -/
-lemma renyiDiv_comp_right_le (ha_pos : 0 < a)
-    (μ ν : Measure α) [IsFiniteMeasure μ] [IsFiniteMeasure ν]
-    (κ : Kernel α β) [IsMarkovKernel κ] :
-    renyiDiv a (κ ∘ₘ μ) (κ ∘ₘ ν) ≤ renyiDiv a μ ν :=
-  le_renyiDiv_of_le_hellingerDiv ha_pos Measure.comp_apply_univ Measure.comp_apply_univ
-    (hellingerDiv_comp_right_le μ ν κ)
 
 end DataProcessingInequality
 
