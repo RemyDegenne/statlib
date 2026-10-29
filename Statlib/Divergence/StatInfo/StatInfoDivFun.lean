@@ -20,6 +20,9 @@ public import Statlib.Divergence.StatInfo.StatInfoFun
 
 ## Main statements
 
+* `statInfoDivFun_apply_of_ne_top`, `realFun_statInfoDivFun_of_nonneg`: on `[0, ∞)`,
+  `statInfoDivFun β γ` is `statInfoFun β γ`. In particular it is finite there
+  (`statInfoDivFun_ne_top`, `xmin_statInfoDivFun`, `xmax_statInfoDivFun`).
 * `derivAtTop_statInfoDivFun_eq`: the derivative at infinity of `statInfoDivFun β γ`.
 * `measurable_lintegral_statInfoDivFun`: measurability in the parameters `(β, γ)`.
 
@@ -47,6 +50,29 @@ def statInfoDivFun (β γ : ℝ) : DivFunction :=
 lemma statInfoDivFun_apply_of_ne_top {x : ℝ≥0∞} (hx : x ≠ ∞) :
     statInfoDivFun β γ x = ENNReal.ofReal (statInfoFun β γ x.toReal) :=
   DivFunction.ofReal_apply_of_continuousWithinAt continuous_statInfoFun.continuousWithinAt hx
+
+/-- `statInfoDivFun β γ` is finite on `[0, ∞)`. -/
+lemma statInfoDivFun_ne_top (β γ : ℝ) {x : ℝ≥0∞} (hx : x ≠ ∞) : statInfoDivFun β γ x ≠ ∞ := by
+  rw [statInfoDivFun_apply_of_ne_top hx]
+  exact ENNReal.ofReal_ne_top
+
+@[simp]
+lemma xmin_statInfoDivFun (β γ : ℝ) : (statInfoDivFun β γ).xmin = 0 := by
+  rw [DivFunction.xmin]
+  exact le_antisymm (sInf_le (statInfoDivFun_ne_top β γ ENNReal.zero_ne_top)) bot_le
+
+@[simp]
+lemma xmax_statInfoDivFun (β γ : ℝ) : (statInfoDivFun β γ).xmax = ∞ := by
+  rw [DivFunction.xmax]
+  exact ENNReal.eq_top_of_forall_nnreal_le fun r ↦
+    le_sSup (statInfoDivFun_ne_top β γ ENNReal.coe_ne_top)
+
+/-- On `[0, ∞)`, the real function associated with `statInfoDivFun β γ` is `statInfoFun β γ`. -/
+lemma realFun_statInfoDivFun_of_nonneg {x : ℝ} (hx : 0 ≤ x) :
+    (statInfoDivFun β γ).realFun x = statInfoFun β γ x := by
+  simp only [DivFunction.realFun]
+  rw [statInfoDivFun_apply_of_ne_top ENNReal.ofReal_ne_top,
+    ENNReal.toReal_ofReal (statInfoFun_nonneg _ _ _), ENNReal.toReal_ofReal hx]
 
 /-- The integral of `statInfoDivFun β γ` against `ν` of the Radon-Nikodym derivative is a
 measurable function of the parameters `(β, γ)`. -/

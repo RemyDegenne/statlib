@@ -12,16 +12,31 @@ public import Statlib.Divergence.StatInfo.FDiv
 # Integral representation of f-divergences
 
 Every f-divergence is an integral of the f-divergences of the functions `statInfoDivFun 1 x`
-(which are statistical informations, see `Statlib.Divergence.StatInfo.FDiv`), against the
-curvature measure of `f`.
+against the curvature measure of `f`. For finite measures with the same mass, those f-divergences
+are statistical informations (`statInfo_eq_fDiv`), hence every f-divergence is an integral of
+statistical informations (Liese and Vajda).
 
 ## Main statements
 
+* `DivFunction.realFun_eq_integral_statInfoFun`: Taylor formula for a divergence function in terms
+  of the hockey-stick functions, `f t = f'(1) (t - 1) + ∫ y, statInfoFun 1 y t ∂γ_f`.
 * `fDiv_add_eq_lintegral_fDiv_statInfoDivFun_add`:
   `fDiv f μ ν + f.rightDeriv 1 * ν univ
     = ∫⁻ x, fDiv (statInfoDivFun 1 x) μ ν ∂f.curvatureMeasureReal + f.rightDeriv 1 * μ univ`.
 * `fDiv_eq_lintegral_fDiv_statInfoDivFun`: the same, for `f` with `f.rightDeriv 1 = 0`:
   `fDiv f μ ν = ∫⁻ x, fDiv (statInfoDivFun 1 x) μ ν ∂f.curvatureMeasureReal`.
+* `fDiv_eq_lintegral_statInfo`: for finite measures with `μ univ = ν univ`,
+  `D_f(μ, ν) = ∫ y, I_{(1, y)}(μ, ν) ∂γ_f`, where `I_π` is the statistical information with
+  prior `π` (for probability measures and `1 ≤ y`, `I_{(1, y)}(μ, ν)` is the hockey-stick
+  divergence `E_y(μ, ν) = sup_E (μ(E) - y ν(E))`).
+* `fDiv_eq_lintegral_statInfo_prior`: the representation of Liese and Vajda,
+  `D_f(μ, ν) = ∫ p, I_{(p, 1 - p)}(μ, ν) ∂Γ_f`, where `I_{(p, 1 - p)}` is the DeGroot statistical
+  information and `Γ_f` is the image of the measure `(1 + y) γ_f(dy)` by `y ↦ (1 + y)⁻¹`.
+
+## References
+
+* F. Liese, I. Vajda, *On divergences and informations in statistics and information theory*,
+  IEEE Transactions on Information Theory 52(10) (2006).
 
 This file is adapted from the testing-lower-bounds project of Rémy Degenne and Lorenzo Luccioli
 (https://github.com/RemyDegenne/testing-lower-bounds).
@@ -144,6 +159,39 @@ lemma lintegral_statInfoFun_curvatureMeasureReal_add {t : ℝ≥0∞} (ht_ne : t
     rw [h_int, ← f.taylor_one_left ht, add_assoc, ← mul_add, tsub_add_cancel_of_le ht,
       mul_one]
 
+/-- **Taylor formula** for a divergence function, in terms of the hockey-stick functions: for
+`0 ≤ t` in the effective domain of `f`,
+`f t = f'(1) (t - 1) + ∫ y, statInfoFun 1 y t ∂γ_f`, where `γ_f` is the curvature measure of `f`.
+See `lintegral_statInfoFun_curvatureMeasureReal_add` for a version in `ℝ≥0∞`. -/
+theorem DivFunction.realFun_eq_integral_statInfoFun (f : DivFunction) {t : ℝ} (ht : 0 ≤ t)
+    (ht_top : f (ENNReal.ofReal t) ≠ ∞) :
+    f.realFun t
+      = f.rightDeriv 1 * (t - 1) + ∫ y, statInfoFun 1 y t ∂f.curvatureMeasureReal := by
+  have h := lintegral_statInfoFun_curvatureMeasureReal_add (f := f)
+    (ENNReal.ofReal_ne_top (r := t))
+  rw [ENNReal.toReal_ofReal ht] at h
+  have h_meas : Measurable fun y ↦ ENNReal.ofReal (statInfoFun 1 y t) :=
+    (measurable_statInfoFun.comp
+      ((measurable_const.prodMk measurable_id).prodMk measurable_const)).ennreal_ofReal
+  have h_lint_ne_top :
+      ∫⁻ y, ENNReal.ofReal (statInfoFun 1 y t) ∂f.curvatureMeasureReal ≠ ∞ := by
+    intro h_top
+    rw [h_top, top_add] at h
+    exact ENNReal.add_ne_top.mpr ⟨ht_top, ENNReal.ofReal_ne_top⟩ h.symm
+  have h_int : Integrable (fun y ↦ statInfoFun 1 y t) f.curvatureMeasureReal := by
+    have := integrable_toReal_of_lintegral_ne_top h_meas.aemeasurable h_lint_ne_top
+    simpa only [ENNReal.toReal_ofReal (statInfoFun_nonneg _ _ _)] using this
+  rw [← ofReal_integral_eq_lintegral_ofReal h_int
+    (ae_of_all _ fun y ↦ statInfoFun_nonneg _ _ _)] at h
+  have h' := congrArg ENNReal.toReal h
+  rw [ENNReal.toReal_add ENNReal.ofReal_ne_top
+      (ENNReal.mul_ne_top ENNReal.ofReal_ne_top ENNReal.ofReal_ne_top),
+    ENNReal.toReal_add ht_top ENNReal.ofReal_ne_top, ENNReal.toReal_mul,
+    ENNReal.toReal_ofReal (integral_nonneg fun y ↦ statInfoFun_nonneg _ _ _),
+    ENNReal.toReal_ofReal f.rightDeriv_one_nonneg, ENNReal.toReal_ofReal ht] at h'
+  simp only [DivFunction.realFun]
+  linarith
+
 lemma lintegral_f_rnDeriv_add_eq_lintegral_fDiv_statInfoDivFun_add_of_ac
     [IsFiniteMeasure μ] [IsFiniteMeasure ν] (h_ac : μ ≪ ν) :
     ∫⁻ x, f ((∂μ/∂ν) x) ∂ν + ENNReal.ofReal (f.rightDeriv 1) * ν univ
@@ -220,5 +268,58 @@ lemma fDiv_eq_lintegral_fDiv_statInfoDivFun [IsFiniteMeasure μ] [IsFiniteMeasur
   simpa [hfderiv_one] using fDiv_add_eq_lintegral_fDiv_statInfoDivFun_add (f := f) (μ := μ) (ν := ν)
 
 end StatInfoFun
+
+section StatInfo
+
+/-- **Integral representation of f-divergences** in terms of statistical informations: for finite
+measures with the same mass, `D_f(μ, ν) = ∫ y, I_{(1, y)}(μ, ν) ∂γ_f`, where `I_π` is the
+statistical information with prior `π` and `γ_f` is the curvature measure of `f`. -/
+theorem fDiv_eq_lintegral_statInfo [IsFiniteMeasure μ] (h_univ : μ univ = ν univ) :
+    fDiv f μ ν
+      = ∫⁻ y, statInfo μ ν (Measure.boolMeasure 1 (ENNReal.ofReal y)) ∂f.curvatureMeasureReal := by
+  have : IsFiniteMeasure ν := ⟨h_univ ▸ measure_lt_top μ univ⟩
+  have h := fDiv_add_eq_lintegral_fDiv_statInfoDivFun_add (f := f) (μ := μ) (ν := ν)
+  rw [h_univ, ENNReal.add_left_inj (ENNReal.mul_ne_top ENNReal.ofReal_ne_top
+    (measure_ne_top _ _))] at h
+  rw [h]
+  refine lintegral_congr_ae ?_
+  filter_upwards [f.ae_nonneg_curvatureMeasureReal] with y hy
+  have : IsFiniteMeasure (Measure.boolMeasure 1 (ENNReal.ofReal y)) :=
+    Measure.isFiniteMeasure_boolMeasure ENNReal.one_ne_top ENNReal.ofReal_ne_top
+  rw [statInfo_eq_fDiv μ ν h_univ, Measure.boolMeasure_apply_false,
+    Measure.boolMeasure_apply_true, ENNReal.toReal_one, ENNReal.toReal_ofReal hy]
+
+/-- **Integral representation of f-divergences** of Liese and Vajda: for finite measures with the
+same mass, `D_f(μ, ν) = ∫ p, I_{(p, 1 - p)}(μ, ν) ∂Γ_f`, where `I_{(p, 1 - p)}` is the DeGroot
+statistical information (the statistical information with prior `(p, 1 - p)`) and `Γ_f` is the
+image of the measure `(1 + y) γ_f(dy)` by `y ↦ (1 + y)⁻¹`, for `γ_f` the curvature measure of
+`f`. -/
+theorem fDiv_eq_lintegral_statInfo_prior [IsFiniteMeasure μ] (h_univ : μ univ = ν univ) :
+    fDiv f μ ν
+      = ∫⁻ p, statInfo μ ν (Measure.boolMeasure (ENNReal.ofReal p) (ENNReal.ofReal (1 - p)))
+          ∂((f.curvatureMeasureReal.withDensity fun y ↦ ENNReal.ofReal (1 + y)).map
+            fun y ↦ (1 + y)⁻¹) := by
+  have : IsFiniteMeasure ν := ⟨h_univ ▸ measure_lt_top μ univ⟩
+  have h_meas : Measurable fun p : ℝ ↦
+      statInfo μ ν (Measure.boolMeasure (ENNReal.ofReal p) (ENNReal.ofReal (1 - p))) :=
+    (measurable_statInfo_boolMeasure_ofReal μ ν).comp (f := fun p : ℝ ↦ (p, 1 - p)) (by fun_prop)
+  have h_meas' : Measurable fun y : ℝ ↦ statInfo μ ν
+      (Measure.boolMeasure (ENNReal.ofReal (1 + y)⁻¹) (ENNReal.ofReal (1 - (1 + y)⁻¹))) :=
+    h_meas.comp (by fun_prop)
+  rw [lintegral_map h_meas (by fun_prop),
+    lintegral_withDensity_eq_lintegral_mul _ (by fun_prop) h_meas',
+    fDiv_eq_lintegral_statInfo h_univ]
+  refine lintegral_congr_ae ?_
+  filter_upwards [f.ae_nonneg_curvatureMeasureReal] with y hy
+  have hy1 : 0 < 1 + y := by linarith
+  simp only [Pi.mul_apply]
+  rw [← statInfo_smul_prior μ ν _ ENNReal.ofReal_ne_top, Measure.smul_boolMeasure,
+    ← ENNReal.ofReal_mul hy1.le, ← ENNReal.ofReal_mul hy1.le, mul_inv_cancel₀ hy1.ne',
+    ENNReal.ofReal_one]
+  congr 3
+  field_simp
+  ring
+
+end StatInfo
 
 end ProbabilityTheory

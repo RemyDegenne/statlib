@@ -263,8 +263,6 @@ lemma toReal_fDiv_statInfoDivFun_eq_statInfo_of_nonneg_of_le [IsFiniteMeasure μ
       = (statInfo μ ν (Measure.boolMeasure (.ofReal β) (.ofReal γ))).toReal
         + 2⁻¹ * (|β * (μ univ).toReal - γ * (ν univ).toReal|
         + γ * (ν univ).toReal - β * (μ univ).toReal) := by
-  have : IsFiniteMeasure (Measure.boolMeasure (.ofReal β) (.ofReal γ)) :=
-    Measure.isFiniteMeasure_boolMeasure ENNReal.ofReal_ne_top ENNReal.ofReal_ne_top
   rw [toReal_statInfo_eq_integral_abs]
   simp only [Measure.boolMeasure_apply_false, ENNReal.toReal_mul, hβ, ENNReal.toReal_ofReal,
     Measure.boolMeasure_apply_true, hγ]
@@ -279,8 +277,6 @@ lemma toReal_fDiv_statInfoDivFun_eq_statInfo_of_nonneg_of_gt [IsFiniteMeasure μ
       = (statInfo μ ν (Measure.boolMeasure (.ofReal β) (.ofReal γ))).toReal
         + 2⁻¹ * (|β * (μ univ).toReal - γ * (ν univ).toReal|
         + β * (μ univ).toReal - γ * (ν univ).toReal) := by
-  have : IsFiniteMeasure (Measure.boolMeasure (.ofReal β) (.ofReal γ)) :=
-    Measure.isFiniteMeasure_boolMeasure ENNReal.ofReal_ne_top ENNReal.ofReal_ne_top
   rw [toReal_statInfo_eq_integral_abs]
   simp only [Measure.boolMeasure_apply_false, ENNReal.toReal_mul, hβ, ENNReal.toReal_ofReal,
     Measure.boolMeasure_apply_true, hγ]

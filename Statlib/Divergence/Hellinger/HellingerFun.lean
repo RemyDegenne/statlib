@@ -25,6 +25,9 @@ public import Statlib.ForMathlib.MeasureTheory.Measure.Decomposition.IntegralRPo
 ## Main statements
 
 * `convexOn_hellingerFun`: `hellingerFun a` is convex on `[0, ∞)` for `0 ≤ a`.
+* `hasDerivAt_hellingerFun_of_ne_one`, `hasDerivAt_deriv_hellingerFun`: for `a ≠ 1` and `x ≠ 0`,
+  the first two derivatives of `hellingerFun a` are `(a - 1)⁻¹ * a * (x ^ (a - 1) - 1)` and
+  `a * x ^ (a - 2)`.
 * `derivAtTop_hellingerFun_of_one_le`, `derivAtTop_hellingerFun_of_lt_one`: the derivative at
   infinity is `⊤` for `1 ≤ a` and `a / (1 - a)` for `a < 1`.
 * `integrable_hellingerFun_iff_integrable_rpow`: integrability of `hellingerFun a (∂μ/∂ν)` is
@@ -57,10 +60,12 @@ variable {α : Type*} {mα : MeasurableSpace α} {μ ν : Measure α} {a : ℝ}
 
 section HellingerFun
 
-/-- Hellinger function, defined as `x ↦ (a - 1)⁻¹ * (x ^ a - 1)` for `a ∈ (0, 1) ∪ (1, + ∞)`.
-At `0` the function is obtained by contiuity and is the indicator function of `{0}`. At `1` it is
-defined as `x ↦ x * log x`, because in this way we obtain that the Hellinger divergence at `1`
-conincides with the KL divergence, which is natural for continuity reasons. -/
+/-- The Hellinger function of order `a`, `x ↦ (a - 1)⁻¹ * (x ^ a - 1 - a * (x - 1))` for `a ≠ 0, 1`.
+The affine term `a * (x - 1)` does not change the f-divergence between probability measures and
+makes the function nonnegative on `[0, ∞)` for `0 ≤ a` (`hellingerFun_nonneg`).
+For `a = 0` it is the indicator function of `{0}`, the pointwise limit as `a → 0`. For `a = 1` it
+is `x ↦ x * log x + 1 - x`, the limit as `a → 1`, so that the Hellinger divergence of order `1`
+coincides with the Kullback-Leibler divergence. -/
 noncomputable
 def hellingerFun (a : ℝ) : ℝ → ℝ :=
   if a = 0 then fun x ↦ if x = 0 then 1 else 0
@@ -158,6 +163,25 @@ lemma hasDerivAt_hellingerFun (a : ℝ) {x : ℝ} (hx : x ≠ 0) :
     refine HasDerivAt.sub ?_ ?_
     · exact (Real.hasDerivAt_rpow_const (Or.inl hx)).sub_const _
     · exact ((hasDerivAt_id x).sub_const _).const_mul _
+
+/-- The derivative of `hellingerFun a`, for `a ≠ 1` and `x ≠ 0` (for `a = 0`, `hellingerFun 0` is
+locally constant on `x ≠ 0` and the formula gives `0`). -/
+lemma hasDerivAt_hellingerFun_of_ne_one (ha1 : a ≠ 1) {x : ℝ} (hx : x ≠ 0) :
+    HasDerivAt (hellingerFun a) ((a - 1)⁻¹ * a * (x ^ (a - 1) - 1)) x := by
+  rcases eq_or_ne a 0 with rfl | ha0
+  · simpa using hasDerivAt_hellingerFun 0 hx
+  · simpa [ha0, ha1] using hasDerivAt_hellingerFun a hx
+
+/-- The derivative of `x ↦ (a - 1)⁻¹ * a * (x ^ (a - 1) - 1)`, which is the derivative of
+`hellingerFun a` for `a ≠ 1` (`hasDerivAt_hellingerFun_of_ne_one`): the second derivative of
+`hellingerFun a` is `a * x ^ (a - 2)`, for `a ≠ 1` and `x ≠ 0`. -/
+lemma hasDerivAt_deriv_hellingerFun (ha1 : a ≠ 1) {x : ℝ} (hx : x ≠ 0) :
+    HasDerivAt (fun x ↦ (a - 1)⁻¹ * a * (x ^ (a - 1) - 1)) (a * x ^ (a - 2)) x := by
+  have ha1' : a - 1 ≠ 0 := sub_ne_zero.mpr ha1
+  refine (((Real.hasDerivAt_rpow_const (p := a - 1) (Or.inl hx)).sub_const 1).const_mul
+    ((a - 1)⁻¹ * a)).congr_deriv ?_
+  rw [show a - 1 - 1 = a - 2 by ring]
+  field_simp
 
 lemma rightDeriv_hellingerFun (a : ℝ) {x : ℝ} (hx : x ≠ 0) :
     derivWithin (hellingerFun a) (Ioi x) x =

@@ -16,6 +16,7 @@ public import Statlib.ForMathlib.Probability.Kernel.Composition.MeasureCompProd
 
 * `fDiv_compProd_left`: `fDiv f (μ ⊗ₘ κ) (ν ⊗ₘ κ) = fDiv f μ ν` for a Markov kernel `κ`.
 * `fDiv_prod_left`: `fDiv f (μ.prod ξ) (ν.prod ξ) = fDiv f μ ν` for a probability measure `ξ`.
+* `fDiv_prod_right`: `fDiv f (ξ.prod μ) (ξ.prod ν) = ξ univ * fDiv f μ ν` for a finite measure `ξ`.
 * `fDiv_comp_right_le`: **data-processing inequality**,
   `fDiv f (κ ∘ₘ μ) (κ ∘ₘ ν) ≤ fDiv f μ ν` for a Markov kernel `κ`.
 * `fDiv_fst_le`, `fDiv_snd_le`, `le_fDiv_compProd`, `fDiv_comp_le_compProd`: other forms of the
@@ -35,6 +36,8 @@ the disintegration of the composition-product, under assumptions on the measurab
 @[expose] public section
 
 open MeasureTheory
+
+open scoped ENNReal NNReal
 
 namespace ProbabilityTheory
 
@@ -59,6 +62,29 @@ lemma fDiv_prod_left (μ ν : Measure α) [IsFiniteMeasure μ] [IsFiniteMeasure 
     (ξ : Measure β) [IsProbabilityMeasure ξ] :
     fDiv f (μ.prod ξ) (ν.prod ξ) = fDiv f μ ν := by
   simpa [Measure.compProd_const] using fDiv_compProd_left (f := f) μ ν (Kernel.const α ξ)
+
+/-- The f-divergence between two products with the same first factor `ξ` is the f-divergence
+between the second factors, multiplied by the mass of `ξ`. -/
+lemma fDiv_prod_right (ξ : Measure β) [IsFiniteMeasure ξ] (μ ν : Measure α) [IsFiniteMeasure μ]
+    [IsFiniteMeasure ν] :
+    fDiv f (ξ.prod μ) (ξ.prod ν) = ξ .univ * fDiv f μ ν := by
+  rcases eq_zero_or_neZero ξ with rfl | hξ
+  · simp
+  -- write `ξ = c • ξ'` for a probability measure `ξ'`, then swap the factors
+  set c : ℝ≥0 := (ξ .univ).toNNReal
+  have hc : (c : ℝ≥0∞) = ξ .univ := ENNReal.coe_toNNReal (measure_ne_top _ _)
+  have hc0 : c ≠ 0 := by
+    rw [← ENNReal.coe_ne_zero, hc]
+    exact NeZero.ne _
+  have : IsProbabilityMeasure (c⁻¹ • ξ) := ⟨by
+    rw [Measure.smul_apply, ← hc, ENNReal.smul_def, smul_eq_mul, ENNReal.coe_inv hc0,
+      ENNReal.inv_mul_cancel (by simpa using hc0) ENNReal.coe_ne_top]⟩
+  have h_prod (ρ : Measure α) [SFinite ρ] : ξ.prod ρ = c • (c⁻¹ • ξ).prod ρ := by
+    rw [Measure.prod_smul_left, smul_smul, mul_inv_cancel₀ hc0, one_smul]
+  have h_emb : MeasurableEmbedding (Prod.swap : α × β → β × α) :=
+    MeasurableEquiv.prodComm.measurableEmbedding
+  rw [h_prod μ, h_prod ν, fDiv_smul_smul, ← Measure.prod_swap (μ := μ),
+    ← Measure.prod_swap (μ := ν), fDiv_map_measurableEmbedding h_emb, fDiv_prod_left, hc]
 
 lemma fDiv_fst_le (μ ν : Measure (α × β)) [IsFiniteMeasure μ] [IsFiniteMeasure ν] :
     fDiv f μ.fst ν.fst ≤ fDiv f μ ν :=

@@ -17,6 +17,8 @@ public import Statlib.ForMathlib.Probability.Kernel.Composition.RadonNikodym
 
 ## Main statements
 
+* `MeasureTheory.Measure.absolutelyContinuous_compProd_iff_fst`:
+  `ρ ≪ μ ⊗ₘ η ↔ ρ.fst ≪ μ ∧ ρ ≪ ρ.fst ⊗ₘ η` for a measure `ρ` on a product space.
 * `ProbabilityTheory.singularPart_compProd_left`, `ProbabilityTheory.singularPart_compProd`,
   `ProbabilityTheory.singularPart_compProd_right`: singular part of `μ ⊗ₘ κ` with respect to
   `ν ⊗ₘ η`.
@@ -26,6 +28,8 @@ public import Statlib.ForMathlib.Probability.Kernel.Composition.RadonNikodym
   `f ((∂μ ⊗ₘ κ/∂ν ⊗ₘ η) x)` in terms of the integrability of its sections, for convex `f`.
 * `ProbabilityTheory.Measure.compProd_univ_toReal`: `((μ ⊗ₘ κ) univ).toReal` as a Bochner
   integral.
+* `MeasureTheory.Measure.neZero_compProd`: `NeZero (μ ⊗ₘ κ)` for a nonzero `μ` and a Markov
+  kernel `κ`.
 
 This file is adapted from the testing-lower-bounds project of Rémy Degenne and Lorenzo Luccioli
 (https://github.com/RemyDegenne/testing-lower-bounds).
@@ -50,6 +54,30 @@ lemma singularPart_compProd_left (μ ν : Measure α) [IsFiniteMeasure μ] [IsFi
     · exact ae_of_all _ fun _ ↦ by rfl
   rw [this, add_zero, Measure.singularPart_eq_self]
   exact Measure.MutuallySingular.compProd_of_left (Measure.mutuallySingular_singularPart _ _) κ κ
+
+/-- A measure `ρ` on a product space is absolutely continuous with respect to `μ ⊗ₘ η` if and only
+if its first marginal is absolutely continuous with respect to `μ` and `ρ ≪ ρ.fst ⊗ₘ η`. -/
+lemma _root_.MeasureTheory.Measure.absolutelyContinuous_compProd_iff_fst {ρ : Measure (α × β)}
+    [IsFiniteMeasure ρ] {μ : Measure α} [SigmaFinite μ] {η : Kernel α β} [IsSFiniteKernel η] :
+    ρ ≪ μ ⊗ₘ η ↔ ρ.fst ≪ μ ∧ ρ ≪ ρ.fst ⊗ₘ η := by
+  -- `(ν ⊗ₘ η) (s ×ˢ univ) = 0` as soon as `ν s = 0`
+  have h_null {ν : Measure α} [SFinite ν] {s : Set α} (hs : MeasurableSet s) (hs0 : ν s = 0) :
+      (ν ⊗ₘ η) (Prod.fst ⁻¹' s) = 0 := by
+    rw [← Set.prod_univ, Measure.compProd_apply_prod hs .univ, setLIntegral_measure_zero _ _ hs0]
+  refine ⟨fun h ↦ ⟨?_, ?_⟩, fun h ↦ h.2.trans (h.1.compProd_left η)⟩
+  · refine Measure.AbsolutelyContinuous.mk fun s hs hs0 ↦ ?_
+    rw [Measure.fst_apply hs]
+    exact h (h_null hs hs0)
+  -- the part of `μ` singular with respect to `ρ.fst` is also singular with respect to `ρ`
+  have hs := Measure.mutuallySingular_singularPart μ ρ.fst
+  have h_ms : ρ ⟂ₘ μ.singularPart ρ.fst ⊗ₘ η := by
+    refine ⟨Prod.fst ⁻¹' hs.nullSetᶜ, measurable_fst hs.measurableSet_nullSet.compl, ?_, ?_⟩
+    · rw [← Measure.fst_apply hs.measurableSet_nullSet.compl, hs.measure_compl_nullSet]
+    · rw [← Set.preimage_compl, compl_compl]
+      exact h_null hs.measurableSet_nullSet hs.measure_nullSet
+  rw [μ.haveLebesgueDecomposition_add ρ.fst, Measure.compProd_add_left, add_comm] at h
+  exact (Measure.absolutelyContinuous_of_add_of_mutuallySingular h h_ms).trans
+    ((withDensity_absolutelyContinuous _ _).compProd_left η)
 
 section CompProd
 
@@ -108,12 +136,15 @@ lemma singularPart_compProd (μ ν : Measure α) [IsFiniteMeasure μ] [IsFiniteM
   rw [this]
   abel
 
-lemma singularPart_compProd_right (μ : Measure α) [IsFiniteMeasure μ]
+lemma singularPart_compProd_right (μ : Measure α)
     (κ η : Kernel α β) [IsFiniteKernel κ] [IsFiniteKernel η] :
-    (μ ⊗ₘ κ).singularPart (μ ⊗ₘ η) = μ ⊗ₘ κ.singularPart η := by
-  rw [singularPart_compProd, Measure.singularPart_self, Measure.compProd_zero_left, zero_add]
+    (μ ⊗ₘ κ).singularPart (μ ⊗ₘ η) = μ ⊗ₘ κ.singularPart η :=
+  (Measure.eq_singularPart (Kernel.measurable_rnDeriv κ η)
+    (Measure.MutuallySingular.compProd_of_right μ μ
+      (.of_forall <| Kernel.mutuallySingular_singularPart κ η))
+    (compProd_eq_compProd_singularPart_add_withDensity μ κ η)).symm
 
-lemma setLIntegral_singularPart (μ : Measure α) [IsFiniteMeasure μ]
+lemma setLIntegral_singularPart (μ : Measure α) [SFinite μ]
     (κ η : Kernel α β) [IsFiniteKernel κ] [IsFiniteKernel η]
     {s : Set α} (hs : MeasurableSet s) {t : Set β} (ht : MeasurableSet t) :
     ∫⁻ a in s, (κ a).singularPart (η a) t ∂μ = (μ ⊗ₘ κ).singularPart (μ ⊗ₘ η) (s ×ˢ t) := by
@@ -121,7 +152,7 @@ lemma setLIntegral_singularPart (μ : Measure α) [IsFiniteMeasure μ]
   simp only [Kernel.singularPart_eq_singularPart_measure]
   rw [lintegral_apply_prodMk_preimage (fun _ ↦ by simp) hs]
 
-lemma lintegral_singularPart (μ : Measure α) [IsFiniteMeasure μ]
+lemma lintegral_singularPart (μ : Measure α) [SFinite μ]
     (κ η : Kernel α β) [IsFiniteKernel κ] [IsFiniteKernel η]
     {s : Set β} (hs : MeasurableSet s) :
     ∫⁻ a, (κ a).singularPart (η a) s ∂μ = (μ ⊗ₘ κ).singularPart (μ ⊗ₘ η) (.univ ×ˢ s) := by
@@ -244,7 +275,7 @@ lemma f_compProd_congr (μ ν : Measure α) [IsFiniteMeasure μ] [IsFiniteMeasur
     (κ η : Kernel α β) [IsFiniteKernel κ] [IsFiniteKernel η] :
     ∀ᵐ a ∂ν, (fun b ↦ f ((∂μ ⊗ₘ κ/∂ν ⊗ₘ η) (a, b)).toReal)
       =ᵐ[η a] fun b ↦ f ((∂μ/∂ν) a * (∂κ a/∂η a) b).toReal := by
-  have h_eq_compProd := Kernel.rnDeriv_measure_compProd' μ ν κ η
+  have h_eq_compProd := rnDeriv_measure_compProd' μ ν κ η
   filter_upwards [h_eq_compProd] with a ha
   filter_upwards [ha] with b hb
   rw [hb]
@@ -301,6 +332,13 @@ lemma Measure.compProd_apply_toReal [SFinite μ] [IsFiniteKernel κ]
 lemma Measure.compProd_univ_toReal [SFinite μ] [IsFiniteKernel κ] :
     ((μ ⊗ₘ κ) .univ).toReal = ∫ x, (κ x .univ).toReal ∂μ :=
   compProd_apply_toReal .univ
+
+/-- The composition-product of a nonzero measure and a Markov kernel is nonzero. -/
+instance _root_.MeasureTheory.Measure.neZero_compProd [SFinite μ] [NeZero μ] [IsMarkovKernel κ] :
+    NeZero (μ ⊗ₘ κ) :=
+  ⟨fun h ↦ NeZero.ne μ (by
+    rw [← Measure.measure_univ_eq_zero, ← Measure.compProd_apply_univ (κ := κ), h,
+      Measure.coe_zero, Pi.zero_apply])⟩
 
 end CompProd
 

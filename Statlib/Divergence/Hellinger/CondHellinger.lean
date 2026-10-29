@@ -15,14 +15,16 @@ public import Statlib.Divergence.Hellinger.Basic
 ## Main definitions
 
 * `condHellingerDiv a κ η μ`: the conditional Hellinger divergence of order `a` between the
-  kernels `κ` and `η` with respect to `μ`, defined as the conditional f-divergence for the
-  divergence function `hellingerDivFun a`.
+  kernels `κ` and `η` with respect to `μ`, `hellingerDiv a (μ ⊗ₘ κ) (μ ⊗ₘ η)`.
 
 ## Main statements
 
-* `hellingerDiv_compProd_right`: `hellingerDiv a (μ ⊗ₘ κ) (μ ⊗ₘ η) = condHellingerDiv a κ η μ`.
+* `condHellingerDiv_eq_lintegral`:
+  `condHellingerDiv a κ η μ = ∫⁻ x, hellingerDiv a (κ x) (η x) ∂μ`, if `α` is countable or `β` is
+  countably generated and `μ` is σ-finite.
 * `hellingerDiv_comp_left_le`: `hellingerDiv a (κ ∘ₘ μ) (η ∘ₘ μ) ≤ condHellingerDiv a κ η μ`.
 * `condHellingerDiv_one`: the conditional Hellinger divergence of order `1` is `condKL`.
+* `condHellingerDiv_ne_top_iff`: finiteness of the conditional Hellinger divergence.
 
 This file is adapted from the testing-lower-bounds project of Rémy Degenne and Lorenzo Luccioli
 (https://github.com/RemyDegenne/testing-lower-bounds).
@@ -40,21 +42,33 @@ variable {α β : Type*} {mα : MeasurableSpace α} {mβ : MeasurableSpace β}
   {μ ν : Measure α} {κ η : Kernel α β}
   {a : ℝ}
 
-/-- Conditional Hellinger divergence of order `a`. -/
+/-- The conditional Hellinger divergence of order `a` between the kernels `κ` and `η` with respect
+to the measure `μ`, defined as `hellingerDiv a (μ ⊗ₘ κ) (μ ⊗ₘ η)`. It is the conditional
+f-divergence for the divergence function `hellingerDivFun a` (`condHellingerDiv_eq_condFDiv`).
+
+If `α` is countable or `β` is countably generated, `μ` is σ-finite and `κ`, `η` are finite, it is
+equal to `∫⁻ x, hellingerDiv a (κ x) (η x) ∂μ` (`condHellingerDiv_eq_lintegral`). See also
+`toReal_condHellingerDiv_eq_integral` and `toReal_condHellingerDiv_eq_integral'` for real-valued
+integral forms. -/
 noncomputable def condHellingerDiv (a : ℝ) (κ η : Kernel α β) (μ : Measure α) : ℝ≥0∞ :=
-  condFDiv (hellingerDivFun a) κ η μ
+  hellingerDiv a (μ ⊗ₘ κ) (μ ⊗ₘ η)
 
-lemma hellingerDiv_compProd_right [CountableOrCountablyGenerated α β]
-    (μ : Measure α) [IsFiniteMeasure μ]
-    (κ η : Kernel α β) [IsFiniteKernel κ] [IsFiniteKernel η] :
-    hellingerDiv a (μ ⊗ₘ κ) (μ ⊗ₘ η) = condHellingerDiv a κ η μ := by
-  rw [hellingerDiv, condHellingerDiv, fDiv_compProd_right _ _ _]
+lemma condHellingerDiv_eq_condFDiv :
+    condHellingerDiv a κ η μ = condFDiv (hellingerDivFun a) κ η μ := rfl
 
-lemma hellingerDiv_comp_left_le [CountableOrCountablyGenerated α β] (μ : Measure α)
-    [IsFiniteMeasure μ]
+/-- The conditional Hellinger divergence is the integral of the Hellinger divergences between the
+kernels. -/
+lemma condHellingerDiv_eq_lintegral [CountableOrCountablyGenerated α β] [SigmaFinite μ]
+    [IsFiniteKernel κ] [IsFiniteKernel η] :
+    condHellingerDiv a κ η μ = ∫⁻ x, hellingerDiv a (κ x) (η x) ∂μ :=
+  condFDiv_eq_lintegral
+
+/-- **Data-processing inequality**: composing a measure with two kernels decreases their
+conditional Hellinger divergence. -/
+lemma hellingerDiv_comp_left_le (μ : Measure α) [IsFiniteMeasure μ]
     (κ η : Kernel α β) [IsFiniteKernel κ] [IsFiniteKernel η] :
     hellingerDiv a (κ ∘ₘ μ) (η ∘ₘ μ) ≤ condHellingerDiv a κ η μ :=
-  fDiv_comp_left_le μ κ η
+  hellingerDiv_comp_le_compProd μ μ κ η
 
 /-! The normal form of the finiteness conditions for the conditional Hellinger divergence, when
 `μ`, `κ` and `η` are finite and `a ∈ (0, 1) ∪ (1, +∞)`, is given by `condHellingerDiv_ne_top_iff`:
@@ -69,9 +83,9 @@ Under these conditions, `toReal_condHellingerDiv_eq_integral'` gives the integra
 -/
 section CondHellingerEq
 
-lemma condHellingerDiv_one [IsFiniteKernel κ] [IsFiniteKernel η] :
+lemma condHellingerDiv_one [IsFiniteMeasure μ] [IsFiniteKernel κ] [IsFiniteKernel η] :
     condHellingerDiv 1 κ η μ = condKL κ η μ := by
-  rw [condHellingerDiv, hellingerDivFun_one, condKL_eq_condFDiv]
+  rw [condHellingerDiv_eq_condFDiv, hellingerDivFun_one, condKL_eq_condFDiv]
 
 lemma hellingerDiv_ae_ne_top_iff [IsFiniteKernel κ] [IsFiniteKernel η]
     (ha_pos : 0 < a) (ha_ne : a ≠ 1) :
@@ -106,8 +120,7 @@ lemma condHellingerDiv_ne_top_iff [CountableOrCountablyGenerated α β] [IsFinit
         ∧ (1 ≤ a → ∀ᵐ x ∂μ, κ x ≪ η x)
         ∧ Integrable (fun x ↦ ∫ b, ((∂κ x/∂η x) b).toReal ^ a ∂η x) μ := by
   have h_meas : Measurable fun x ↦ hellingerDiv a (κ x) (η x) := measurable_fDiv _ _
-  have h_eq : condHellingerDiv a κ η μ = ∫⁻ x, hellingerDiv a (κ x) (η x) ∂μ := rfl
-  rw [h_eq]
+  rw [condHellingerDiv_eq_lintegral]
   constructor
   · intro h
     have h_ae : ∀ᵐ x ∂μ, hellingerDiv a (κ x) (η x) ≠ ∞ :=
@@ -160,12 +173,12 @@ lemma condHellingerDiv_eq_top_iff_of_lt_one [CountableOrCountablyGenerated α β
       ↔ ¬ Integrable (fun x ↦ ∫ b, ((∂κ x/∂η x) b).toReal ^ a ∂η x) μ := by
   rw [← not_not (a := _ = ∞), ← ne_eq, condHellingerDiv_ne_top_iff_of_lt_one ha_pos ha_lt]
 
-lemma condHellingerDiv_of_not_ae_ac_of_one_le [CountableOrCountablyGenerated α β]
+lemma condHellingerDiv_of_not_ae_ac_of_one_le [CountableOrCountablyGenerated α β] [SigmaFinite μ]
     [IsFiniteKernel κ] [IsFiniteKernel η] (ha : 1 ≤ a) (h_ac : ¬ ∀ᵐ x ∂μ, κ x ≪ η x) :
     condHellingerDiv a κ η μ = ∞ :=
   condFDiv_of_not_ae_ac (derivAtTop_hellingerDivFun_eq_top_iff.mpr ha) h_ac
 
-lemma toReal_condHellingerDiv_eq_integral [CountableOrCountablyGenerated α β]
+lemma toReal_condHellingerDiv_eq_integral [CountableOrCountablyGenerated α β] [SigmaFinite μ]
     [IsFiniteKernel κ] [IsFiniteKernel η] (h : condHellingerDiv a κ η μ ≠ ∞) :
     (condHellingerDiv a κ η μ).toReal = ∫ x, (hellingerDiv a (κ x) (η x)).toReal ∂μ :=
   toReal_condFDiv_eq_integral h
@@ -179,7 +192,7 @@ lemma toReal_condHellingerDiv_eq_integral' [CountableOrCountablyGenerated α β]
         + ((μ ⊗ₘ η) .univ).toReal + (1 - a)⁻¹ * a * ((μ ⊗ₘ κ) .univ).toReal := by
   have h_meas : Measurable fun x ↦ hellingerDiv a (κ x) (η x) := measurable_fDiv _ _
   have h_ae : ∀ᵐ x ∂μ, hellingerDiv a (κ x) (η x) ≠ ∞ :=
-    (ae_lt_top h_meas h).mono fun x hx ↦ hx.ne
+    (ae_lt_top h_meas (by rwa [← condHellingerDiv_eq_lintegral])).mono fun x hx ↦ hx.ne
   obtain ⟨-, -, h_int'⟩ := (condHellingerDiv_ne_top_iff ha_pos ha_ne).mp h
   rw [toReal_condHellingerDiv_eq_integral h]
   calc ∫ x, (hellingerDiv a (κ x) (η x)).toReal ∂μ

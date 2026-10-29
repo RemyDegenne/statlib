@@ -36,6 +36,9 @@ These are the functions used to define f-divergences.
   of its effective domain.
 * `DivFunction.le_of_forall_rat_tangent_le`: if `g` dominates the supporting lines of `f` at all
   rational interior points, evaluated at `y`, then `f y ≤ g`.
+* `DivFunction.le_of_forall_ne_zero_ne_top`, `DivFunction.eq_of_forall_ne_zero_ne_top`: by
+  continuity, inequalities and equalities between divergence functions extend from `(0, ∞)` to
+  `[0, ∞]`.
 * `DivFunction.map_lintegral_le`, `DivFunction.map_laverage_le`: **Jensen's inequality** for a
   divergence function.
 
@@ -582,6 +585,22 @@ instance : Module ℝ≥0 DivFunction where
   zero_smul _ := ext fun _ ↦ zero_mul _
 
 end Module
+
+section ExtensionByContinuity
+
+/-- If two divergence functions satisfy `f x ≤ g x` on `(0, ∞)`, then `f ≤ g` everywhere, by
+continuity. Applied to `c • g`, it extends `f x ≤ c * g x` from `(0, ∞)` to `[0, ∞]`. -/
+lemma le_of_forall_ne_zero_ne_top (h : ∀ x, x ≠ 0 → x ≠ ∞ → f x ≤ g x) (x : ℝ≥0∞) :
+    f x ≤ g x :=
+  le_on_closure (s := Ioo 0 ∞) (fun y hy ↦ h y hy.1.ne' hy.2.ne) f.continuous.continuousOn
+    g.continuous.continuousOn (by simp [closure_Ioo ENNReal.zero_ne_top])
+
+/-- Two divergence functions which agree on `(0, ∞)` are equal. -/
+lemma eq_of_forall_ne_zero_ne_top (h : ∀ x, x ≠ 0 → x ≠ ∞ → f x = g x) : f = g :=
+  ext fun x ↦ le_antisymm (le_of_forall_ne_zero_ne_top (fun y hy0 hy ↦ (h y hy0 hy).le) x)
+    (le_of_forall_ne_zero_ne_top (fun y hy0 hy ↦ (h y hy0 hy).ge) x)
+
+end ExtensionByContinuity
 
 end DivFunction
 

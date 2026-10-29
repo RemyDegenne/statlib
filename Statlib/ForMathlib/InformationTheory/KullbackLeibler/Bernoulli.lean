@@ -32,6 +32,12 @@ Bernoulli.lean`), which also defines an `ℝ≥0∞`-valued version.
 * `klBerReal_nonneg`: Gibbs' inequality, `0 ≤ klBerReal p q` for `p ∈ [0, 1]` and `q ∈ (0, 1)`.
 * `klDiv_bernoulliMeasure_eq_klBerReal`: for `x ≠ y` and `q ∉ {0, 1}`,
   `klDiv Ber(x, y, p) Ber(x, y, q) = ENNReal.ofReal (klBerReal p q)`.
+* `ofReal_klBerReal_le_klDiv_bernoulliMeasure`: for `x ≠ y` and any `p, q`,
+  `ENNReal.ofReal (klBerReal p q) ≤ klDiv Ber(x, y, p) Ber(x, y, q)`.
+* `klDiv_boolMeasure_ofReal_eq_klBerReal`: for `p ∈ [0, 1]` and `q ∈ (0, 1)`, the divergence
+  between the priors `boolMeasure (ENNReal.ofReal p) (ENNReal.ofReal (1 - p))` and
+  `boolMeasure (ENNReal.ofReal q) (ENNReal.ofReal (1 - q))` on `Bool` is
+  `ENNReal.ofReal (klBerReal p q)`.
 -/
 
 @[expose] public section
@@ -83,6 +89,13 @@ lemma klBerReal_eq_neg_binEntropy_sub (hq : q ≠ 0) (hq1 : q ≠ 1) :
   simp only [binEntropy_eq_negMulLog_add_negMulLog_one_sub, negMulLog_def]
   ring
 
+/-- The binary Kullback-Leibler divergence to the parameter `1/2`. -/
+lemma klBerReal_two_inv_right (p : ℝ) : klBerReal p 2⁻¹ = log 2 - binEntropy p := by
+  rw [klBerReal_eq_neg_binEntropy_sub (by norm_num) (by norm_num)]
+  have h : (1 : ℝ) - 2⁻¹ = 2⁻¹ := by norm_num
+  rw [h, Real.log_inv]
+  ring
+
 /-- **Gibbs' inequality** for Bernoulli distributions: the binary divergence is nonnegative. -/
 lemma klBerReal_nonneg (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (hq0 : 0 < q) (hq1 : q < 1) :
     0 ≤ klBerReal p q := by
@@ -119,6 +132,37 @@ lemma klDiv_bernoulliMeasure_eq_klBerReal (hxy : x ≠ y) (p : I) {q : I} (hq : 
   simp only [klFun, klBerReal]
   field_simp
   ring
+
+/-- The binary Kullback-Leibler divergence `klBerReal p q` is a lower bound for the
+Kullback-Leibler divergence between the Bernoulli distributions with parameters `p` and `q`, with
+equality for `q ∉ {0, 1}` (`klDiv_bernoulliMeasure_eq_klBerReal`). -/
+lemma ofReal_klBerReal_le_klDiv_bernoulliMeasure (hxy : x ≠ y) (p q : I) :
+    ENNReal.ofReal (klBerReal p q) ≤ klDiv Ber(x, y, p) Ber(x, y, q) := by
+  rcases eq_or_ne q 0 with rfl | hq0
+  · -- `klBerReal p 0 = (1 - p) * log (1 - p) ≤ 0`
+    refine (ENNReal.ofReal_of_nonpos ?_).trans_le zero_le
+    simpa [klBerReal] using mul_log_nonpos (sub_nonneg.2 p.2.2) (sub_le_self _ p.2.1)
+  rcases eq_or_ne q 1 with rfl | hq1
+  · -- `klBerReal p 1 = p * log p ≤ 0`
+    refine (ENNReal.ofReal_of_nonpos ?_).trans_le zero_le
+    simpa [klBerReal] using mul_log_nonpos p.2.1 p.2.2
+  rw [klDiv_bernoulliMeasure_eq_klBerReal hxy p hq0 hq1]
+
+/-- The Kullback-Leibler divergence between two priors on `Bool` is the binary Kullback-Leibler
+divergence between their parameters, for `p ∈ [0, 1]` and `q ∈ (0, 1)`. -/
+lemma klDiv_boolMeasure_ofReal_eq_klBerReal {p q : ℝ} (hp0 : 0 ≤ p) (hp1 : p ≤ 1) (hq0 : 0 < q)
+    (hq1 : q < 1) :
+    klDiv (Measure.boolMeasure (ENNReal.ofReal p) (ENNReal.ofReal (1 - p)))
+      (Measure.boolMeasure (ENNReal.ofReal q) (ENNReal.ofReal (1 - q)))
+      = ENNReal.ofReal (klBerReal p q) := by
+  have hp := Measure.boolMeasure_ofReal_eq_bernoulliMeasure ⟨p, hp0, hp1⟩
+  have hq := Measure.boolMeasure_ofReal_eq_bernoulliMeasure ⟨q, hq0.le, hq1.le⟩
+  simp only at hp hq
+  rw [hp, hq, klDiv_bernoulliMeasure_eq_klBerReal (by decide)]
+  · simp only [ne_eq, Subtype.ext_iff, Set.Icc.coe_zero]
+    exact hq0.ne'
+  · simp only [ne_eq, Subtype.ext_iff, Set.Icc.coe_one]
+    exact hq1.ne
 
 end BernoulliMeasure
 

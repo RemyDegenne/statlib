@@ -551,6 +551,11 @@ lemma continuousAt_sub_const {c x : EReal} (h' : x ≠ ⊥ ∨ c ≠ ⊥) :
     exact continuous_const.continuousAt
   exact (EReal.continuousAt_sub (Or.inr hc_top) h').comp (f := fun x ↦ (x, c)) (by fun_prop)
 
+lemma continuous_coe_add (c : ℝ) : Continuous (fun x : EReal ↦ c + x) :=
+  continuous_iff_continuousAt.2 fun x ↦ (EReal.continuousAt_add (p := (c, x))
+    (.inl (EReal.coe_ne_top c)) (.inl (EReal.coe_ne_bot c))).comp
+    (continuous_const.prodMk continuous_id).continuousAt
+
 lemma continuous_coe_mul (c : ℝ) : Continuous (fun x : EReal ↦ c * x) := by
   by_cases hc0 : c = 0
   · simp only [hc0, EReal.coe_zero, zero_mul]

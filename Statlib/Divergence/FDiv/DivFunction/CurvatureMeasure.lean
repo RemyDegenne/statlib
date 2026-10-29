@@ -456,6 +456,13 @@ lemma curvatureMeasureReal_apply (f : DivFunction) {s : Set ℝ} (hs : Measurabl
     f.curvatureMeasureReal s = f.curvatureMeasure (ENNReal.toReal ⁻¹' s) := by
   rw [curvatureMeasureReal, Measure.map_apply (by fun_prop) hs]
 
+/-- The measure `f.curvatureMeasureReal` is concentrated on `[0, ∞)`. -/
+lemma ae_nonneg_curvatureMeasureReal (f : DivFunction) :
+    ∀ᵐ y ∂f.curvatureMeasureReal, 0 ≤ y := by
+  rw [curvatureMeasureReal]
+  exact (ae_map_iff (p := fun y : ℝ ↦ 0 ≤ y) (by fun_prop) measurableSet_Ici).mpr
+    (ae_of_all _ fun x ↦ ENNReal.toReal_nonneg)
+
 instance : SFinite f.curvatureMeasure := by
   rw [curvatureMeasure]
   infer_instance
