@@ -176,7 +176,7 @@ private lemma integral_max_eq_integral_abs [IsFiniteMeasure μ] [IsFiniteMeasure
   swap; · exact (integrable_add_const_iff.mpr h_int).abs
   congr
   nth_rw 2 [μ.haveLebesgueDecomposition_add ν]
-  simp only [Measure.coe_add, Pi.add_apply, MeasurableSet.univ, withDensity_apply,
+  simp only [FunLike.coe_add, Pi.add_apply, MeasurableSet.univ, withDensity_apply,
     Measure.restrict_univ]
   rw [ENNReal.toReal_add (measure_ne_top _ _)]
   swap; · exact lt_top_iff_ne_top.mp <| (setLIntegral_univ _ ▸
@@ -201,7 +201,7 @@ private lemma integral_max_eq_integral_abs' [IsFiniteMeasure μ] [IsFiniteMeasur
   swap; · exact (h_int.sub (integrable_const _)).abs
   congr
   nth_rw 2 [μ.haveLebesgueDecomposition_add ν]
-  simp only [Measure.coe_add, Pi.add_apply, MeasurableSet.univ, withDensity_apply,
+  simp only [FunLike.coe_add, Pi.add_apply, MeasurableSet.univ, withDensity_apply,
     Measure.restrict_univ]
   rw [ENNReal.toReal_add (measure_ne_top _ _)]
   swap; · exact lt_top_iff_ne_top.mp <| (setLIntegral_univ _ ▸

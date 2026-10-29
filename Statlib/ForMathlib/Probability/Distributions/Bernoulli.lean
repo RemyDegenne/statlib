@@ -233,7 +233,7 @@ lemma bernoulliKernel_comp_eq_bernoulliMeasure (x y : 𝓧) (μ : Measure I) [Is
     simp
   ext s hs
   rw [Measure.bind_apply hs (bernoulliKernel x y).aemeasurable]
-  simp_rw [bernoulliKernel_apply, bernoulliMeasure_def, Measure.add_apply, Measure.smul_apply,
+  simp_rw [bernoulliKernel_apply, bernoulliMeasure_def, add_apply, smul_apply,
     ENNReal.smul_def, smul_eq_mul, coe_toNNReal_eq_ofReal, coe_symm_eq]
   rw [lintegral_add_left (by fun_prop), lintegral_mul_const _ (by fun_prop),
     lintegral_mul_const _ (by fun_prop), h1, h2]

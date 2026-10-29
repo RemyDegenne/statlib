@@ -1447,9 +1447,9 @@ lemma measure_add (f g : ERealStieltjes) :
       rw [measure_Ioc_add hab.le hfp hfq hgp hgq]
       exact ENNReal.add_ne_top.mpr ⟨f.measure_Ioc_ne_top hfp hfq, g.measure_Ioc_ne_top hgp hgq⟩
     refine Measure.ext_of_Ioc_finite _ _ ?_ fun x y hxy ↦ ?_
-    · simp only [Measure.restrict_apply_univ, Measure.coe_add, Pi.add_apply]
+    · simp only [Measure.restrict_apply_univ, FunLike.coe_add, Pi.add_apply]
       exact measure_Ioc_add hab.le hfp hfq hgp hgq
-    · simp only [Measure.restrict_apply measurableSet_Ioc, Measure.coe_add, Pi.add_apply,
+    · simp only [Measure.restrict_apply measurableSet_Ioc, FunLike.coe_add, Pi.add_apply,
         Ioc_inter_Ioc]
       rcases le_or_gt (min y b) (max x a) with h | h
       · simp [Ioc_eq_empty_of_le h]
@@ -1460,7 +1460,7 @@ lemma measure_add (f g : ERealStieltjes) :
   · -- at the two jump points, both measures have an infinite atom
     rw [Measure.restrict_singleton, Measure.restrict_singleton]
     congr 1
-    rw [Measure.coe_add, Pi.add_apply]
+    rw [FunLike.coe_add, Pi.add_apply]
     rcases hx with hx | hx
     · rw [φ.measure_singleton_eq_top fun y hy ↦ by rw [hx.2 y hy, EReal.sub_bot hx.1.1],
         eq_comm, ENNReal.add_eq_top]
@@ -1513,7 +1513,7 @@ lemma measure_add_of_eq_bot_iff_of_eq_top_iff (f g : ERealStieltjes)
       rcases add_apply_eq_top_iff.mp hy with h | h
       exacts [⟨h, (h_top y).mp h⟩, ⟨(h_top y).mpr h, h⟩]
   rw [measure_add, Measure.restrict_eq_self_of_ae_mem]
-  rw [ae_iff, Measure.coe_add, Pi.add_apply, add_eq_zero]
+  rw [ae_iff, FunLike.coe_add, Pi.add_apply, add_eq_zero]
   constructor
   · refine measure_mono_null (fun x hx ↦ ?_)
       (measure_union_null f.measure_setOf_eq_bot f.measure_setOf_exists_lt_eq_top)

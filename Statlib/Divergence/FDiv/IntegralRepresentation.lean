@@ -230,7 +230,7 @@ theorem fDiv_add_eq_lintegral_fDiv_statInfoDivFun_add [IsFiniteMeasure μ] [IsFi
   have h_ac : ν.withDensity (∂μ/∂ν) ≪ ν := withDensity_absolutelyContinuous _ _
   have hμ : μ univ = ν.withDensity (∂μ/∂ν) univ + μ.singularPart ν univ := by
     conv_lhs => rw [μ.haveLebesgueDecomposition_add ν]
-    rw [Measure.add_apply, add_comm]
+    rw [add_apply, add_comm]
   have h_in : ∀ x, fDiv (statInfoDivFun 1 x) μ ν
       = fDiv (statInfoDivFun 1 x) (ν.withDensity (∂μ/∂ν)) ν
         + (statInfoDivFun 1 x).derivAtTop * μ.singularPart ν univ :=

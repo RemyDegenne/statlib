@@ -72,7 +72,7 @@ theorem statInfo_eq_iSup_sub (μ ν : Measure 𝒳) [IsFiniteMeasure μ] [IsFini
   have := μ.smul_finite (measure_ne_top π {false})
   have := ν.smul_finite (measure_ne_top π {true})
   rw [statInfo_eq_statInfo_one_one, statInfo_one_one_eq_iSup_sub_sub]
-  simp only [Measure.smul_apply, smul_eq_mul]
+  simp only [smul_apply, smul_eq_mul]
 
 /-- **Statistical information as a supremum over events**: for finite measures and a finite prior,
 `I_π(μ, ν) = sup_E (π₀ μ(E) - π₁ ν(E)) - max {0, π₀ μ(𝒳) - π₁ ν(𝒳)}`. -/

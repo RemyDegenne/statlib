@@ -213,7 +213,7 @@ lemma fDiv_eq_lintegral_mixtureFun (μ ν : Measure α) [SigmaFinite μ] [SigmaF
     filter_upwards [Measure.rnDeriv_eq_div_rnDeriv_add μ ν] with x hx
     rw [hx]
   have h2 : f.derivAtTop * μ N = ∫⁻ x, N.indicator (fun _ ↦ f.derivAtTop) x ∂(μ + ν) := by
-    rw [lintegral_indicator hN, setLIntegral_const, Measure.add_apply, hνN, add_zero]
+    rw [lintegral_indicator hN, setLIntegral_const, add_apply, hνN, add_zero]
   rw [fDiv, Measure.singularPart_eq_restrict_rnDeriv_add_eq_zero, Measure.restrict_apply_univ,
     h1, h2, ← lintegral_add_right _ (measurable_const.indicator hN)]
   refine lintegral_congr_ae ?_
@@ -272,7 +272,7 @@ lemma fDiv_add_measure_le (μ₁ μ₂ ν : Measure α) [SigmaFinite μ₁] [Sig
   rw [this, fDiv_absolutelyContinuous_add_mutuallySingular
       ((withDensity_absolutelyContinuous _ _).add_left (withDensity_absolutelyContinuous _ _))
       ((μ₁.mutuallySingular_singularPart _).add_left (μ₂.mutuallySingular_singularPart _))]
-  simp only [Measure.coe_add, Pi.add_apply]
+  simp only [FunLike.coe_add, Pi.add_apply]
   conv_rhs => rw [add_comm (μ₁.singularPart ν)]
   rw [fDiv_absolutelyContinuous_add_mutuallySingular (withDensity_absolutelyContinuous _ _)
     (μ₁.mutuallySingular_singularPart _)]

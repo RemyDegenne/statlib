@@ -86,7 +86,7 @@ finite factor scales the statistical information by the same factor. -/
 lemma statInfo_smul_prior (μ ν : Measure 𝒳) (π : Measure Bool) {c : ℝ≥0∞} (hc : c ≠ ∞) :
     statInfo μ ν (c • π) = c * statInfo μ ν π := by
   rw [statInfo_eq_min_sub, statInfo_eq_min_sub, bayesBinaryRisk_smul_prior μ ν π hc,
-    Measure.smul_apply, Measure.smul_apply, smul_eq_mul, smul_eq_mul, mul_assoc, mul_assoc,
+    smul_apply, smul_apply, smul_eq_mul, smul_eq_mul, mul_assoc, mul_assoc,
     ← mul_min, ENNReal.mul_sub fun _ _ ↦ hc]
 
 @[simp] lemma statInfo_zero_left : statInfo 0 ν π = 0 := by simp [statInfo_eq_min_sub]

@@ -86,7 +86,7 @@ lemma singularPart_eq_restrict_rnDeriv_add_eq_zero (μ ν : Measure α) [SigmaFi
     exact hxN.2 (hx hxN.1)
   refine singularPart_eq_restrict ?_ hνN
   rw [← restrict_apply_univ, ← singularPart_restrict μ ν hN.compl, singularPart_eq_zero_of_ac h_ac,
-    coe_zero, Pi.zero_apply]
+    FunLike.coe_zero, Pi.zero_apply]
 
 /-- On the set where `∂μ/∂ν` does not vanish, `∂ν/∂μ` is its inverse, `ν`-almost everywhere. -/
 lemma rnDeriv_eq_inv_rnDeriv_of_ne_zero (μ ν : Measure α) [SigmaFinite μ] [SigmaFinite ν] :

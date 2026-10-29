@@ -90,7 +90,7 @@ theorem tendsto_renyiDiv_map_of_iSup_comap_eq (ha : 0 < a) (μ ν : Measure α)
     refine tendsto_const_nhds.congr fun n ↦ ?_
     rw [Measure.map_zero]
     rcases eq_or_ne a 1 with rfl | ha1
-    · simp_rw [renyiDiv_one, Measure.coe_zero, Pi.zero_apply, smul_zero,
+    · simp_rw [renyiDiv_one, FunLike.coe_zero, Pi.zero_apply, smul_zero,
         InformationTheory.klDiv_of_ac_of_integrable (.zero _) integrable_zero_measure]
       simp [measureReal_def, Measure.map_apply (hg n) .univ]
     · simp [renyiDiv_zero_measure_left ha.le ha1]
