@@ -24,6 +24,7 @@ f-divergence is an integral of such f-divergences
 ## Main statements
 
 * `convexOn_statInfoFun`, `continuous_statInfoFun`, `measurable_statInfoFun`: regularity.
+* `hasDerivWithinAt_statInfoFun_Ioi`: the right derivative of `statInfoFun β γ` for `0 ≤ β`.
 * `derivAtTop_statInfoFun_of_nonneg_of_le` and its variants: the slope at infinity of
   `statInfoFun β γ`, which is always finite (`derivAtTop_statInfoFun_ne_top`).
 * `statInfoFun_of_one_of_one_le_right`, `statInfoFun_of_one_of_right_le_one`: `statInfoFun 1 γ x`
@@ -118,6 +119,53 @@ lemma continuous_statInfoFun : Continuous (statInfoFun β γ) := by
 lemma continuousWithinAt_statInfoFun_zero :
     ContinuousWithinAt (statInfoFun β γ) (Ioi 0) 0 :=
   continuous_statInfoFun.continuousWithinAt
+
+/-- The right derivative of `statInfoFun β γ` for `0 ≤ β`: it is `-β` (if `γ ≤ β`) or `0`
+(if `β < γ`) before `γ / β`, and increases by `β` at `γ / β`. -/
+lemma hasDerivWithinAt_statInfoFun_Ioi (hβ : 0 ≤ β) (x : ℝ) :
+    HasDerivWithinAt (statInfoFun β γ)
+      ((if γ ≤ β then -β else 0) + if γ / β ≤ x then β else 0) (Ioi x) x := by
+  rcases hβ.eq_or_lt with rfl | hβ
+  · simpa [statInfoFun_zero', Pi.zero_def] using hasDerivWithinAt_const x (Ioi x) (0 : ℝ)
+  rcases le_or_gt γ β with hγβ | hγβ
+  · rw [ite_eq_left hγβ]
+    rcases lt_or_ge x (γ / β) with hx | hx
+    · rw [ite_eq_right (not_le.mpr hx), add_zero]
+      have h_eq : ∀ y, y < γ / β → statInfoFun β γ y = γ - β * y := fun y hy ↦ by
+        rw [statInfoFun_of_le hγβ, max_eq_right]
+        have : β * y < γ := by rwa [lt_div_iff₀ hβ, mul_comm] at hy
+        linarith
+      have h_aff : HasDerivWithinAt (fun y ↦ γ - β * y) (-β) (Ioi x) x := by
+        have := ((hasDerivAt_id x).const_mul β).const_sub γ
+        simpa using this.hasDerivWithinAt
+      refine h_aff.congr_of_eventuallyEq ?_ (h_eq x hx)
+      filter_upwards [Ioo_mem_nhdsGT hx] with y hy using h_eq y hy.2
+    · rw [ite_eq_left hx, neg_add_cancel]
+      have h_eq : ∀ y, γ / β ≤ y → statInfoFun β γ y = 0 := fun y hy ↦ by
+        rw [statInfoFun_of_le hγβ, max_eq_left]
+        have : γ ≤ β * y := by rwa [div_le_iff₀ hβ, mul_comm] at hy
+        linarith
+      refine (hasDerivWithinAt_const x _ (0 : ℝ)).congr_of_eventuallyEq ?_ (h_eq x hx)
+      filter_upwards [self_mem_nhdsWithin] with y (hy : x < y) using h_eq y (hx.trans hy.le)
+  · rw [ite_eq_right (not_le.mpr hγβ), zero_add]
+    rcases lt_or_ge x (γ / β) with hx | hx
+    · rw [ite_eq_right (not_le.mpr hx)]
+      have h_eq : ∀ y, y < γ / β → statInfoFun β γ y = 0 := fun y hy ↦ by
+        rw [statInfoFun_of_gt hγβ, max_eq_left]
+        have : β * y < γ := by rwa [lt_div_iff₀ hβ, mul_comm] at hy
+        linarith
+      refine (hasDerivWithinAt_const x _ (0 : ℝ)).congr_of_eventuallyEq ?_ (h_eq x hx)
+      filter_upwards [Ioo_mem_nhdsGT hx] with y hy using h_eq y hy.2
+    · rw [ite_eq_left hx]
+      have h_eq : ∀ y, γ / β ≤ y → statInfoFun β γ y = β * y - γ := fun y hy ↦ by
+        rw [statInfoFun_of_gt hγβ, max_eq_right]
+        have : γ ≤ β * y := by rwa [div_le_iff₀ hβ, mul_comm] at hy
+        linarith
+      have h_aff : HasDerivWithinAt (fun y ↦ β * y - γ) β (Ioi x) x := by
+        have := ((hasDerivAt_id x).const_mul β).sub_const γ
+        simpa using this.hasDerivWithinAt
+      refine h_aff.congr_of_eventuallyEq ?_ (h_eq x hx)
+      filter_upwards [self_mem_nhdsWithin] with y (hy : x < y) using h_eq y (hx.trans hy.le)
 
 section derivAtTop
 

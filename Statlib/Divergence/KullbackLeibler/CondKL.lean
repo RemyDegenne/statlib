@@ -7,8 +7,10 @@ module
 
 public import Mathlib.InformationTheory.KullbackLeibler.ChainRule
 public import Mathlib.Probability.Kernel.Disintegration.StandardBorel
+public import Mathlib.Probability.Kernel.Posterior
 public import Statlib.Divergence.KullbackLeibler.Basic
 public import Statlib.ForMathlib.InformationTheory.KullbackLeibler.Basic
+public import Statlib.ForMathlib.InformationTheory.KullbackLeibler.DataProcessing
 public import Statlib.Divergence.FDiv.CondFDiv
 public import Statlib.Divergence.FDiv.CompProd
 
@@ -18,19 +20,29 @@ public import Statlib.Divergence.FDiv.CompProd
 ## Main definitions
 
 * `condKL κ η μ`: the conditional Kullback-Leibler divergence of the kernels `κ` and `η` with
-  respect to `μ`, `∫⁻ a, klDiv (κ a) (η a) ∂μ`.
+  respect to `μ`, `klDiv (μ ⊗ₘ κ) (μ ⊗ₘ η)`.
 
 ## Main statements
 
+* `condKL_eq_lintegral`: `condKL κ η μ = ∫⁻ a, klDiv (κ a) (η a) ∂μ`, if `α` is countable or `β`
+  is countably generated and `μ` is finite.
 * `condKL_ne_top_iff`: finiteness of the conditional divergence.
+* `klDiv_compProd_boolKernel_prod`, `klDiv_prod_compProd_boolKernel`: for a finite measure `ρ` on
+  `Bool`, `KL(ρ ⊗ₘ boolKernel μ ν, ρ × ξ) = ρ {false} * KL(μ, ξ) + ρ {true} * KL(ν, ξ)`, and the
+  same with the arguments of `KL` swapped.
 * `klDiv_compProd_eq_add_condKL`, `klDiv_fst_add_condKL`: chain rules for the Kullback-Leibler
   divergence.
+* `klDiv_compProd_eq_add_condKL_posterior`: chain rule with the posteriors (Bayesian inverses),
+  `KL(μ ⊗ₘ κ, ν ⊗ₘ η) = KL(κ ∘ₘ μ, η ∘ₘ ν) + KL(κ†μ, η†ν | κ ∘ₘ μ)`.
 * `condKL_compProd_kernel`: chain rule for the conditional divergence.
 * `klDiv_prod_two`, `klDiv_pi`: tensorization.
 
-These results need `CountableOrCountablyGenerated` assumptions to express the conditional
-divergence through Radon-Nikodym derivatives of kernels, except for the tensorization results,
-which follow from Mathlib's chain rule `InformationTheory.klDiv_compProd_eq_add`.
+The chain rules follow from Mathlib's chain rule `InformationTheory.klDiv_compProd_eq_add`. Those
+stated with composition-products (`klDiv_compProd_eq_add_condKL`, `condKL_compProd_kernel`) hold
+without assumptions on the measurable spaces. `klDiv_fst_add_condKL` and
+`klDiv_compProd_eq_add_condKL_posterior` need standard Borel spaces, for the disintegration and the
+posterior to exist. The results expressing the conditional divergence through the kernels `κ a`
+and `η a` need `CountableOrCountablyGenerated` assumptions.
 
 This file is adapted from the testing-lower-bounds project of Rémy Degenne and Lorenzo Luccioli
 (https://github.com/RemyDegenne/testing-lower-bounds).
@@ -56,27 +68,71 @@ lemma klDiv_ae_ne_top_iff : (∀ᵐ a ∂μ, klDiv (κ a) (η a) ≠ ∞) ↔
     (∀ᵐ a ∂μ, κ a ≪ η a) ∧ (∀ᵐ a ∂μ, Integrable (llr (κ a) (η a)) (κ a)) := by
   simp_rw [klDiv_ne_top_iff, eventually_and]
 
-open Classical in
-/--
-Kullback-Leibler divergence between two kernels κ and η conditional to a measure μ.
-It is defined as KL(κ, η | μ) := ∫ x, KL(κ x, η x) dμ.
--/
+/-- The Kullback-Leibler divergence between the kernels `κ` and `η` conditional to the measure `μ`,
+defined as `klDiv (μ ⊗ₘ κ) (μ ⊗ₘ η)`.
+
+If `α` is countable or `β` is countably generated, `μ` is finite and `κ`, `η` are finite, it is
+equal to `∫⁻ a, klDiv (κ a) (η a) ∂μ` (`condKL_eq_lintegral`). See also
+`toReal_condKL_eq_integral` for its real-valued version. -/
 noncomputable
 def condKL (κ η : Kernel α β) (μ : Measure α) : ℝ≥0∞ :=
-  ∫⁻ a, klDiv (κ a) (η a) ∂μ
+  klDiv (μ ⊗ₘ κ) (μ ⊗ₘ η)
 
-lemma condKL_eq_condFDiv [IsFiniteKernel κ] [IsFiniteKernel η] :
-    condKL κ η μ = condFDiv klDivFun κ η μ := by
-  simp_rw [condKL, condFDiv, klDiv_eq_fDiv]
+lemma condKL_eq_condFDiv [IsFiniteMeasure μ] [IsFiniteKernel κ] [IsFiniteKernel η] :
+    condKL κ η μ = condFDiv klDivFun κ η μ :=
+  klDiv_eq_fDiv
+
+@[simp]
+lemma condKL_self (κ : Kernel α β) (μ : Measure α) [SigmaFinite μ] [IsFiniteKernel κ] :
+    condKL κ κ μ = 0 :=
+  klDiv_self _
+
+@[simp]
+lemma condKL_zero_left [IsFiniteMeasure μ] [IsFiniteKernel η] :
+    condKL 0 η μ = ∫⁻ a, η a Set.univ ∂μ := by
+  rw [condKL, Measure.compProd_zero_right, klDiv_zero_left, Measure.compProd_apply .univ]
+  simp
+
+lemma condKL_zero_right [SFinite μ] [IsSFiniteKernel κ] (h : ∃ᵐ a ∂μ, κ a ≠ 0) :
+    condKL κ 0 μ = ∞ := by
+  -- `μ ⊗ₘ κ` is not zero since its mass is `∫⁻ a, κ a univ ∂μ`
+  have h_ne : μ ⊗ₘ κ ≠ 0 := by
+    intro h0
+    refine h ?_
+    have h_univ : ∫⁻ a, κ a .univ ∂μ = 0 := by
+      have h_univ := congrArg (fun ρ : Measure (α × β) ↦ ρ .univ) h0
+      simpa [Measure.compProd_apply MeasurableSet.univ] using h_univ
+    filter_upwards [(lintegral_eq_zero_iff (κ.measurable_coe .univ)).mp h_univ] with a ha
+    simpa using ha
+  have : NeZero (μ ⊗ₘ κ) := ⟨h_ne⟩
+  rw [condKL, Measure.compProd_zero_right, klDiv_zero_right]
+
+@[simp]
+lemma condKL_zero_measure : condKL κ η 0 = 0 := by simp [condKL]
+
+@[simp]
+lemma condKL_isEmpty_left [IsEmpty α] : condKL κ η μ = 0 := by
+  simp [condKL, Subsingleton.elim (μ ⊗ₘ κ) 0, Subsingleton.elim (μ ⊗ₘ η) 0]
+
+@[simp]
+lemma condKL_const {ξ : Measure β} [IsFiniteMeasure ξ] [IsFiniteMeasure μ] [IsFiniteMeasure ν] :
+    condKL (Kernel.const β μ) (Kernel.const β ν) ξ = (klDiv μ ν) * ξ .univ := by
+  rw [condKL_eq_condFDiv, klDiv_eq_fDiv]
+  exact condFDiv_const
 
 section CondKLEq
 
-variable [CountableOrCountablyGenerated α β] [IsFiniteKernel κ] [IsFiniteKernel η]
+variable [CountableOrCountablyGenerated α β] [IsFiniteMeasure μ] [IsFiniteKernel κ]
+  [IsFiniteKernel η]
+
+/-- The conditional KL divergence is the integral of the KL divergences between the kernels. -/
+lemma condKL_eq_lintegral : condKL κ η μ = ∫⁻ a, klDiv (κ a) (η a) ∂μ := by
+  simp_rw [condKL_eq_condFDiv, condFDiv_eq_lintegral, klDiv_eq_fDiv]
 
 @[simp]
 lemma condKL_of_not_ae_ne_top (h : ¬ ∀ᵐ a ∂μ, klDiv (κ a) (η a) ≠ ∞) :
     condKL κ η μ = ∞ := by
-  rw [condKL]
+  rw [condKL_eq_lintegral]
   by_contra h'
   exact h ((ae_lt_top (measurable_klDiv _ _) h').mono fun x hx ↦ hx.ne)
 
@@ -90,7 +146,7 @@ lemma condKL_ne_top_iff :
     condKL κ η μ ≠ ∞
     ↔ (∀ᵐ a ∂μ, κ a ≪ η a) ∧ (∀ᵐ a ∂μ, Integrable (llr (κ a) (η a)) (κ a))
       ∧ Integrable (fun a ↦ (klDiv (κ a) (η a)).toReal) μ := by
-  rw [← and_assoc, ← klDiv_ae_ne_top_iff]
+  rw [← and_assoc, ← klDiv_ae_ne_top_iff, condKL_eq_lintegral]
   refine ⟨fun h ↦ ?_, fun ⟨h_ae, h_int⟩ ↦ ?_⟩
   · have h_ae : ∀ᵐ a ∂μ, klDiv (κ a) (η a) ≠ ∞ :=
       (ae_lt_top (measurable_klDiv κ η) h).mono fun _ ha ↦ ha.ne
@@ -106,60 +162,47 @@ lemma condKL_eq_top_iff :
 
 lemma toReal_condKL_eq_integral (h : condKL κ η μ ≠ ∞) :
     (condKL κ η μ).toReal = ∫ a, (klDiv (κ a) (η a)).toReal ∂μ := by
-  rw [condKL, integral_toReal (measurable_klDiv _ _).aemeasurable]
+  rw [condKL_eq_lintegral] at h ⊢
+  rw [integral_toReal (measurable_klDiv _ _).aemeasurable]
   exact ae_lt_top (measurable_klDiv _ _) h
 
 end CondKLEq
-
-@[simp]
-lemma condKL_self (κ : Kernel α β) (μ : Measure α) [IsFiniteKernel κ] : condKL κ κ μ = 0 := by
-  simp [condKL]
-
-@[simp]
-lemma condKL_zero_left [IsFiniteKernel η] :
-    condKL 0 η μ = ∫⁻ a, η a Set.univ ∂μ := by simp [condKL_eq_condFDiv]
-
-lemma condKL_zero_right [CountableOrCountablyGenerated α β]
-    [IsFiniteKernel κ] (h : ∃ᵐ a ∂μ, κ a ≠ 0) :
-    condKL κ 0 μ = ∞ := by
-  rw [condKL_of_not_ae_ac]
-  simp [h]
-
-@[simp]
-lemma condKL_zero_measure : condKL κ η 0 = 0 := by simp [condKL]
-
-@[simp]
-lemma condKL_isEmpty_left [IsEmpty α] : condKL κ η μ = 0 := by simp [condKL]
-
-@[simp]
-lemma condKL_const {ξ : Measure β} [IsFiniteMeasure μ] [IsFiniteMeasure ν] :
-    condKL (Kernel.const β μ) (Kernel.const β ν) ξ = (klDiv μ ν) * ξ .univ := by
-  rw [condKL_eq_condFDiv, klDiv_eq_fDiv]
-  exact condFDiv_const
 
 section CompProd
 
 /-- The conditional KL divergence with respect to a composition-product `μ ⊗ₘ ξ` is an iterated
 conditional KL divergence. -/
-lemma condKL_measure_compProd [CountableOrCountablyGenerated (α × β) γ] [SFinite μ]
-    {ξ : Kernel α β} [IsSFiniteKernel ξ] {κ η : Kernel (α × β) γ} [IsFiniteKernel κ]
+lemma condKL_measure_compProd [CountableOrCountablyGenerated (α × β) γ] [IsFiniteMeasure μ]
+    {ξ : Kernel α β} [IsFiniteKernel ξ] {κ η : Kernel (α × β) γ} [IsFiniteKernel κ]
     [IsFiniteKernel η] :
     condKL κ η (μ ⊗ₘ ξ) = ∫⁻ x, condKL (κ.sectR x) (η.sectR x) (ξ x) ∂μ := by
   simp_rw [condKL_eq_condFDiv, condFDiv_measure_compProd]
 
-lemma klDiv_compProd_eq_condKL [CountableOrCountablyGenerated α β]
-    [IsFiniteMeasure μ] [IsFiniteKernel κ] [IsFiniteKernel η] :
-    klDiv (μ ⊗ₘ κ) (μ ⊗ₘ η) = condKL κ η μ := by
-  rw [klDiv_eq_fDiv, condKL_eq_condFDiv]
-  exact fDiv_compProd_right μ κ η
+/-- The Kullback-Leibler divergence between `ρ ⊗ₘ boolKernel μ ν` and `ρ × ξ` is the sum of
+`KL(μ, ξ)` and `KL(ν, ξ)` weighted by `ρ {false}` and `ρ {true}`. -/
+lemma klDiv_compProd_boolKernel_prod (ρ : Measure Bool) [IsFiniteMeasure ρ] (μ ν ξ : Measure α)
+    [IsFiniteMeasure μ] [IsFiniteMeasure ν] [IsFiniteMeasure ξ] :
+    klDiv (ρ ⊗ₘ Kernel.boolKernel μ ν) (ρ.prod ξ)
+      = ρ {false} * klDiv μ ξ + ρ {true} * klDiv ν ξ := by
+  rw [← Measure.compProd_const, ← condKL, condKL_eq_lintegral, lintegral_bool]
+  simp [mul_comm]
+
+/-- The Kullback-Leibler divergence between `ρ × ξ` and `ρ ⊗ₘ boolKernel μ ν` is the sum of
+`KL(ξ, μ)` and `KL(ξ, ν)` weighted by `ρ {false}` and `ρ {true}`. -/
+lemma klDiv_prod_compProd_boolKernel (ρ : Measure Bool) [IsFiniteMeasure ρ] (μ ν ξ : Measure α)
+    [IsFiniteMeasure μ] [IsFiniteMeasure ν] [IsFiniteMeasure ξ] :
+    klDiv (ρ.prod ξ) (ρ ⊗ₘ Kernel.boolKernel μ ν)
+      = ρ {false} * klDiv ξ μ + ρ {true} * klDiv ξ ν := by
+  rw [← Measure.compProd_const, ← condKL, condKL_eq_lintegral, lintegral_bool]
+  simp [mul_comm]
 
 section ChainRule
 
 /-- The **chain rule** for the KL divergence. -/
-lemma klDiv_compProd_eq_add_condKL [CountableOrCountablyGenerated α β]
-    [IsMarkovKernel κ] [IsMarkovKernel η] [IsFiniteMeasure μ] [IsFiniteMeasure ν] :
-    klDiv (μ ⊗ₘ κ) (ν ⊗ₘ η) = klDiv μ ν + condKL κ η μ := by
-  rw [klDiv_compProd_eq_add, klDiv_compProd_eq_condKL]
+lemma klDiv_compProd_eq_add_condKL [IsMarkovKernel κ] [IsMarkovKernel η] [IsFiniteMeasure μ]
+    [IsFiniteMeasure ν] :
+    klDiv (μ ⊗ₘ κ) (ν ⊗ₘ η) = klDiv μ ν + condKL κ η μ :=
+  klDiv_compProd_eq_add μ ν κ η
 
 /-- The **chain rule** for the KL divergence. -/
 lemma klDiv_fst_add_condKL [StandardBorelSpace β] [Nonempty β] {μ ν : Measure (α × β)}
@@ -167,19 +210,25 @@ lemma klDiv_fst_add_condKL [StandardBorelSpace β] [Nonempty β] {μ ν : Measur
     klDiv μ.fst ν.fst + condKL μ.condKernel ν.condKernel μ.fst = klDiv μ ν := by
   rw [← klDiv_compProd_eq_add_condKL, μ.disintegrate, ν.disintegrate]
 
-/-- The **chain rule** for the conditional KL divergence. -/
-lemma condKL_compProd_kernel [CountableOrCountablyGenerated α β]
-    [CountableOrCountablyGenerated (α × β) γ] {κ₁ η₁ : Kernel α β}
-    {κ₂ η₂ : Kernel (α × β) γ} [IsFiniteKernel κ₁] [IsFiniteKernel η₁] [IsMarkovKernel κ₂]
-    [IsMarkovKernel η₂] [SFinite μ] :
-    condKL (κ₁ ⊗ₖ κ₂) (η₁ ⊗ₖ η₂) μ = condKL κ₁ η₁ μ + condKL κ₂ η₂ (μ ⊗ₘ κ₁) := by
-  rcases isEmpty_or_nonempty α with hα | hα
-  · simp
-  have := countableOrCountablyGenerated_right_of_prod_left_of_nonempty (α := α) (β := β) (γ := γ)
-  rw [condKL_measure_compProd, condKL, condKL, ← lintegral_add_left (measurable_klDiv _ _)]
-  refine lintegral_congr fun a ↦ ?_
-  rw [Kernel.compProd_apply_eq_compProd_sectR, Kernel.compProd_apply_eq_compProd_sectR,
+/-- **Chain rule** for the KL divergence, with the posteriors (Bayesian inverses) `κ†μ` and `η†ν`:
+`KL(μ ⊗ₘ κ, ν ⊗ₘ η) = KL(κ ∘ₘ μ, η ∘ₘ ν) + KL(κ†μ, η†ν | κ ∘ₘ μ)`. -/
+lemma klDiv_compProd_eq_add_condKL_posterior [StandardBorelSpace α] [Nonempty α]
+    [IsFiniteMeasure μ] [IsFiniteMeasure ν] [IsFiniteKernel κ] [IsFiniteKernel η] :
+    klDiv (μ ⊗ₘ κ) (ν ⊗ₘ η) = klDiv (κ ∘ₘ μ) (η ∘ₘ ν) + condKL (κ†μ) (η†ν) (κ ∘ₘ μ) := by
+  rw [← klDiv_map_swap, ← compProd_posterior_eq_map_swap, ← compProd_posterior_eq_map_swap,
     klDiv_compProd_eq_add_condKL]
+
+/-- The **chain rule** for the conditional KL divergence:
+`KL(κ₁ ⊗ κ₂, η₁ ⊗ η₂ | μ) = KL(κ₁, η₁ | μ) + KL(κ₂, η₂ | μ ⊗ κ₁)`. That is,
+`KL(μ ⊗ (κ₁ ⊗ κ₂), μ ⊗ (η₁ ⊗ η₂)) = KL(μ ⊗ κ₁, μ ⊗ η₁) + KL((μ ⊗ κ₁) ⊗ κ₂, (μ ⊗ κ₁) ⊗ η₂)`. -/
+lemma condKL_compProd_kernel [IsFiniteMeasure μ] {κ₁ η₁ : Kernel α β}
+    {κ₂ η₂ : Kernel (α × β) γ} [IsFiniteKernel κ₁] [IsFiniteKernel η₁] [IsMarkovKernel κ₂]
+    [IsMarkovKernel η₂] :
+    condKL (κ₁ ⊗ₖ κ₂) (η₁ ⊗ₖ η₂) μ = condKL κ₁ η₁ μ + condKL κ₂ η₂ (μ ⊗ₘ κ₁) := by
+  simp only [condKL]
+  rw [← Measure.compProd_assoc', ← Measure.compProd_assoc',
+    klDiv_map_measurableEmbedding _ _ MeasurableEquiv.prodAssoc.measurableEmbedding,
+    klDiv_compProd_eq_add]
 
 end ChainRule
 
@@ -191,8 +240,9 @@ section DataProcessingInequality
 
 variable {β : Type*} {mβ : MeasurableSpace β} {κ η : Kernel α β}
 
-lemma klDiv_comp_left_le [CountableOrCountablyGenerated α β]
-    (μ : Measure α) [IsFiniteMeasure μ]
+/-- **Data-processing inequality**: composing a measure with two kernels decreases their
+conditional KL divergence. -/
+lemma klDiv_comp_left_le (μ : Measure α) [IsFiniteMeasure μ]
     (κ η : Kernel α β) [IsFiniteKernel κ] [IsFiniteKernel η] :
     klDiv (κ ∘ₘ μ) (η ∘ₘ μ) ≤ condKL κ η μ := by
   rw [klDiv_eq_fDiv, condKL_eq_condFDiv]
@@ -208,17 +258,7 @@ variable {β : Type*} {mβ : MeasurableSpace β}
 lemma klDiv_prod_right [IsFiniteMeasure μ] {ξ ψ : Measure β} [IsFiniteMeasure ξ]
     [IsFiniteMeasure ψ] :
     klDiv (μ.prod ξ) (μ.prod ψ) = μ .univ * klDiv ξ ψ := by
-  rcases eq_zero_or_neZero μ with rfl | hμ
-  · simp
-  have hμ0 : μ .univ ≠ 0 := by simp [NeZero.ne μ]
-  have h_prod (ρ : Measure β) [SFinite ρ] : μ.prod ρ = μ .univ • ((μ .univ)⁻¹ • μ).prod ρ := by
-    rw [← Measure.prod_smul_left, smul_smul, ENNReal.mul_inv_cancel hμ0 (measure_ne_top _ _),
-      one_smul]
-  have h_emb : MeasurableEmbedding (Prod.swap : β × α → α × β) :=
-    MeasurableEquiv.prodComm.measurableEmbedding
-  rw [h_prod ξ, h_prod ψ, klDiv_smul_same' (measure_ne_top μ .univ), ← Measure.prod_swap (μ := ξ),
-    ← Measure.prod_swap (μ := ψ), klDiv_eq_fDiv, klDiv_eq_fDiv,
-    fDiv_map_measurableEmbedding h_emb, fDiv_prod_left]
+  rw [klDiv_eq_fDiv, klDiv_eq_fDiv, fDiv_prod_right]
 
 lemma klDiv_prod_two' {ξ ψ : Measure β} [IsProbabilityMeasure ξ] [IsProbabilityMeasure ψ]
     [IsFiniteMeasure μ] [IsFiniteMeasure ν] :

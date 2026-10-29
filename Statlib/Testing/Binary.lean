@@ -10,27 +10,34 @@ public import Mathlib.MeasureTheory.Measure.Decomposition.IntegralRNDeriv
 public import Mathlib.Probability.Decision.BayesEstimator
 public import Mathlib.Probability.Decision.Risk.Basic
 public import Statlib.ForMathlib.Probability.Decision.BayesEstimator
+public import Statlib.ForMathlib.Probability.Decision.Risk.Basic
+public import Statlib.ForMathlib.Probability.Decision.ZeroOneLoss
 
 /-!
 # Simple Bayesian binary hypothesis testing
 
 We test between two measures `μ` and `ν`, with a prior `π` on `Bool` (`false` stands for `μ` and
 `true` for `ν`) and the 0-1 loss. This is the estimation problem with parameter space `Bool`,
-data generating kernel `Kernel.boolKernel μ ν` and loss `simpleBinaryLoss`.
+data generating kernel `Kernel.boolKernel μ ν` and the 0-1 loss `zeroOneLoss` on `Bool`.
 
 ## Main definitions
 
-* `simpleBinaryLoss`: the 0-1 loss on `Bool`, `ℓ(y, z) = 𝕀{y ≠ z}`.
+* `binaryArgminEstimator μ ν π`: the test that answers `true` (that is, `ν`) where
+  `π {false} * ∂μ/∂P ≤ π {true} * ∂ν/∂P`, for `P = Kernel.boolKernel μ ν ∘ₘ π`.
 * `bayesBinaryRisk μ ν π`: the Bayes risk of the simple binary hypothesis testing problem between
   `μ` and `ν` with respect to the prior `π`.
 
 ## Main statements
 
+* `isArgminEstimator_binaryArgminEstimator`: `binaryArgminEstimator μ ν π` is an argmin estimator,
+  hence a Bayes estimator.
 * `bayesBinaryRisk_le_bayesBinaryRisk_comp`: data-processing inequality.
 * `bayesBinaryRisk_eq_iInf_measurableSet`: the Bayes binary risk is the infimum over the measurable
   sets `E` of the risk `π {false} * μ E + π {true} * ν Eᶜ` of the test with rejection region `E`.
 * `bayesBinaryRisk_eq_lintegral_min_rnDeriv`: the Bayes binary risk is
   `∫⁻ x, min (π {false} * (∂μ/∂ν) x) (π {true}) ∂ν`.
+* `bayesBinaryRisk_eq_zero_iff_mutuallySingular`: for a prior with positive weights, the Bayes
+  binary risk vanishes if and only if `μ ⟂ₘ ν`.
 * `bayesBinaryRisk_eq_lintegral_min`, `toReal_bayesBinaryRisk_eq_integral_abs`: integral formulas
   for the Bayes binary risk with respect to the joint law `Kernel.boolKernel μ ν ∘ₘ π`.
 
@@ -51,31 +58,27 @@ variable {𝒳 𝒳' : Type*} {m𝒳 : MeasurableSpace 𝒳} {m𝒳' : Measurabl
 
 section SimpleBinaryHypTest
 
-/-- The loss of the simple binary hypothesis testing problem: `ℓ(y, z) = 𝕀{y ≠ z}`. -/
-noncomputable
-def simpleBinaryLoss (y z : Bool) : ℝ≥0∞ := if y = z then 0 else 1
+@[simp] lemma zeroOneLoss_true_false : zeroOneLoss true false = 1 := zeroOneLoss_of_ne (by simp)
 
-@[simp] lemma simpleBinaryLoss_self (y : Bool) : simpleBinaryLoss y y = 0 := by
-  simp [simpleBinaryLoss]
-
-@[simp] lemma simpleBinaryLoss_true_false : simpleBinaryLoss true false = 1 := by
-  simp [simpleBinaryLoss]
-
-@[simp] lemma simpleBinaryLoss_false_true : simpleBinaryLoss false true = 1 := by
-  simp [simpleBinaryLoss]
-
-lemma measurable_simpleBinaryLoss : Measurable (Function.uncurry simpleBinaryLoss) :=
-  .of_discrete
+@[simp] lemma zeroOneLoss_false_true : zeroOneLoss false true = 1 := zeroOneLoss_of_ne (by simp)
 
 @[simp]
-lemma lintegral_simpleBinaryLoss_true (ξ : Measure Bool) :
-    ∫⁻ z, simpleBinaryLoss true z ∂ξ = ξ {false} := by
-  simp [lintegral_fintype, simpleBinaryLoss]
+lemma lintegral_zeroOneLoss_true (ξ : Measure Bool) :
+    ∫⁻ z, zeroOneLoss true z ∂ξ = ξ {false} := by
+  simp [lintegral_fintype]
 
 @[simp]
-lemma lintegral_simpleBinaryLoss_false (ξ : Measure Bool) :
-    ∫⁻ z, simpleBinaryLoss false z ∂ξ = ξ {true} := by
-  simp [lintegral_fintype, simpleBinaryLoss]
+lemma lintegral_zeroOneLoss_false (ξ : Measure Bool) :
+    ∫⁻ z, zeroOneLoss false z ∂ξ = ξ {true} := by
+  simp [lintegral_fintype]
+
+/-- For a measure `ζ` on `Bool`, the smallest expected 0-1 loss of an action is
+`min (ζ {false}) (ζ {true})`: this is the Bayes risk of a constant kernel for simple binary
+hypothesis testing with prior `ζ`. -/
+lemma iInf_lintegral_zeroOneLoss_bool (ζ : Measure Bool) :
+    ⨅ y, ∫⁻ θ, zeroOneLoss θ y ∂ζ = min (ζ {false}) (ζ {true}) := by
+  rw [iInf_bool_eq]
+  simp [lintegral_fintype]
 
 /-- The function `x ↦ 𝕀{π₀ * ∂μ/∂(boolKernel μ ν ∘ₘ π) x ≤ π₁ * ∂ν/∂(boolKernel μ ν ∘ₘ π) x}`.
 It is an argmin estimator for the simple binary hypothesis testing problem. -/
@@ -85,34 +88,32 @@ def binaryArgminEstimator (μ ν : Measure 𝒳) (π : Measure Bool) : 𝒳 → 
     ≤ π {true} * ν.rnDeriv (Kernel.boolKernel μ ν ∘ₘ π) x}
   fun x ↦ Bool.ofNat (E.indicator 1 x)
 
+/-- `binaryArgminEstimator μ ν π` maximizes the posterior weight
+`z ↦ π {z} * ∂(boolKernel μ ν z)/∂(boolKernel μ ν ∘ₘ π)`, hence is an argmin estimator, and a
+Bayes estimator, for simple binary hypothesis testing. -/
 lemma isArgminEstimator_binaryArgminEstimator (μ ν : Measure 𝒳) [IsFiniteMeasure μ]
     [IsFiniteMeasure ν] (π : Measure Bool) [IsFiniteMeasure π] :
-    IsArgminEstimator simpleBinaryLoss (Kernel.boolKernel μ ν) π
+    IsArgminEstimator zeroOneLoss (Kernel.boolKernel μ ν) π
       (binaryArgminEstimator μ ν π) := by
-  refine ⟨?_, ?_⟩
+  refine isArgminEstimator_zeroOneLoss ?_ (ae_of_all _ fun x z ↦ ?_)
   · simp_rw [binaryArgminEstimator]
     refine Measurable.of_discrete.fun_comp (measurable_one.indicator (measurableSet_le ?_ ?_))
       <;> fun_prop
-  · filter_upwards [posterior_boolKernel_apply_true μ ν π,
-      posterior_boolKernel_apply_false μ ν π] with x h_true h_false
-    refine le_antisymm (le_iInf fun b ↦ ?_) (iInf_le _ _)
-    cases b <;> by_cases
-      π {false} * (∂μ/∂Kernel.boolKernel μ ν ∘ₘ π) x
+  · have hf : binaryArgminEstimator μ ν π x = decide (π {false} * (∂μ/∂Kernel.boolKernel μ ν ∘ₘ π) x
+        ≤ π {true} * (∂ν/∂Kernel.boolKernel μ ν ∘ₘ π) x) := by
+      simp [binaryArgminEstimator, Bool.ofNat, Set.indicator_apply]
+    rw [hf]
+    by_cases h : π {false} * (∂μ/∂Kernel.boolKernel μ ν ∘ₘ π) x
         ≤ π {true} * (∂ν/∂Kernel.boolKernel μ ν ∘ₘ π) x
-      <;> simp_all [lintegral_bool, binaryArgminEstimator, Bool.ofNat, simpleBinaryLoss,
-        -not_le, le_of_not_ge]
-
-lemma hasArgminEstimator_simpleBinaryLoss (μ ν : Measure 𝒳) [IsFiniteMeasure μ]
-    [IsFiniteMeasure ν] (π : Measure Bool) [IsFiniteMeasure π] :
-    HasArgminEstimator simpleBinaryLoss (Kernel.boolKernel μ ν) π :=
-  ⟨_, isArgminEstimator_binaryArgminEstimator μ ν π⟩
+    · cases z <;> simp [h]
+    · cases z <;> simp [h, (not_le.mp h).le]
 
 end SimpleBinaryHypTest
 
 /-- The Bayes risk of simple binary hypothesis testing with respect to a prior. -/
 noncomputable
 def bayesBinaryRisk (μ ν : Measure 𝒳) (π : Measure Bool) : ℝ≥0∞ :=
-  bayesRisk simpleBinaryLoss (Kernel.boolKernel μ ν) π
+  bayesRisk zeroOneLoss (Kernel.boolKernel μ ν) π
 
 lemma bayesBinaryRisk_eq_iInf_kernel (μ ν : Measure 𝒳) (π : Measure Bool) :
     bayesBinaryRisk μ ν π
@@ -122,8 +123,8 @@ lemma bayesBinaryRisk_eq_iInf_kernel (μ ν : Measure 𝒳) (π : Measure Bool) 
   congr with κ
   congr with _
   simp only [avgRisk, lintegral_bool, Kernel.comp_boolKernel, Kernel.boolKernel_apply,
-    Bool.false_eq_true, ↓reduceIte, simpleBinaryLoss_self, simpleBinaryLoss_true_false,
-    simpleBinaryLoss_false_true, zero_mul, one_mul, zero_add, add_zero]
+    Bool.false_eq_true, ↓reduceIte, zeroOneLoss_self, zeroOneLoss_true_false,
+    zeroOneLoss_false_true, zero_mul, one_mul, zero_add, add_zero]
   ring
 
 variable {π : Measure Bool}
@@ -133,6 +134,12 @@ lemma bayesBinaryRisk_smul_smul (μ ν : Measure 𝒳) (π : Measure Bool) (a b 
     bayesBinaryRisk (a • μ) (b • ν) π
       = bayesBinaryRisk μ ν (π.withDensity (fun x ↦ bif x then b else a)) := by
   simp [bayesBinaryRisk_eq_iInf_kernel, lintegral_dirac, mul_assoc]
+
+/-- The Bayes binary risk is positively homogeneous in the prior: scaling the prior by a finite
+factor scales the Bayes binary risk by the same factor. -/
+lemma bayesBinaryRisk_smul_prior (μ ν : Measure 𝒳) (π : Measure Bool) {c : ℝ≥0∞} (hc : c ≠ ∞) :
+    bayesBinaryRisk μ ν (c • π) = c * bayesBinaryRisk μ ν π :=
+  bayesRisk_smul_prior _ _ _ hc
 
 lemma bayesBinaryRisk_eq_bayesBinaryRisk_one_one (μ ν : Measure 𝒳) (π : Measure Bool) :
     bayesBinaryRisk μ ν π
@@ -183,6 +190,15 @@ lemma bayesBinaryRisk_le_min (μ ν : Measure 𝒳) (π : Measure Bool) :
     bayesBinaryRisk μ ν π ≤ min (π {false} * μ .univ) (π {true} * ν .univ) := by
   convert bayesBinaryRisk_le_bayesBinaryRisk_comp μ ν π (Kernel.discard 𝒳)
   rw [Measure.discard_comp, Measure.discard_comp, bayesBinaryRisk_dirac]
+
+/-- For a probability measure `μ`, the Bayes binary risk for a prior with mass `α` at `false` (for
+example the prior `(α, 1 - α)`) is at most `α`. -/
+lemma toReal_bayesBinaryRisk_boolMeasure_le (μ ν : Measure 𝒳) [IsProbabilityMeasure μ] (α : ℝ≥0)
+    (b : ℝ≥0∞) :
+    (bayesBinaryRisk μ ν (Measure.boolMeasure α b)).toReal ≤ α := by
+  have h := (bayesBinaryRisk_le_min μ ν (Measure.boolMeasure α b)).trans (min_le_left _ _)
+  rw [Measure.boolMeasure_apply_false, measure_univ, mul_one] at h
+  exact ENNReal.toReal_le_coe_of_le_coe h
 
 @[simp] lemma bayesBinaryRisk_zero_left : bayesBinaryRisk 0 ν π = 0 :=
   le_antisymm ((bayesBinaryRisk_le_min _ _ _).trans (by simp)) zero_le
@@ -252,7 +268,7 @@ lemma bayesBinaryRisk_symm (μ ν : Measure 𝒳) (π : Measure Bool) :
 
 lemma avgRisk_binary_of_deterministic_indicator (μ ν : Measure 𝒳) (π : Measure Bool)
     {E : Set 𝒳} (hE : MeasurableSet E) :
-    avgRisk simpleBinaryLoss (Kernel.boolKernel μ ν)
+    avgRisk zeroOneLoss (Kernel.boolKernel μ ν)
       (Kernel.deterministic (fun x ↦ Bool.ofNat (E.indicator 1 x))
         (Measurable.of_discrete.fun_comp (measurable_one.indicator hE))) π
       = π {false} * μ E + π {true} * ν Eᶜ := by
@@ -263,8 +279,8 @@ lemma avgRisk_binary_of_deterministic_indicator (μ ν : Measure 𝒳) (π : Mea
   have h2 : (fun x ↦ Bool.ofNat (E.indicator 1 x)) ⁻¹' {true} = E := by
     ext; simp [Bool.ofNat]
   simp only [avgRisk, lintegral_bool, Kernel.comp_boolKernel, Kernel.boolKernel_apply,
-    Bool.false_eq_true, ↓reduceIte, simpleBinaryLoss_self, simpleBinaryLoss_true_false,
-    simpleBinaryLoss_false_true, zero_mul, one_mul, zero_add, add_zero,
+    Bool.false_eq_true, ↓reduceIte, zeroOneLoss_self, zeroOneLoss_true_false,
+    zeroOneLoss_false_true, zero_mul, one_mul, zero_add, add_zero,
     Measure.deterministic_comp_eq_map, Measure.map_apply h_meas trivial, h1, h2]
   ring
 
@@ -280,7 +296,7 @@ lemma bayesBinaryRisk_eq_iInf_measurableSet (μ ν : Measure 𝒳) [IsFiniteMeas
       ≤ π {true} * (∂ν/∂Kernel.boolKernel μ ν ∘ₘ π) x}
     have hE : MeasurableSet E := measurableSet_le (by fun_prop) (by fun_prop)
     rw [bayesBinaryRisk, ← (isArgminEstimator_binaryArgminEstimator μ ν π).isBayesEstimator
-      measurable_simpleBinaryLoss, IsArgminEstimator.kernel]
+      measurable_zeroOneLoss, IsArgminEstimator.kernel]
     simp_rw [binaryArgminEstimator]
     rw [avgRisk_binary_of_deterministic_indicator _ _ _ hE]
     exact iInf_le_of_le E (iInf_le _ hE)
@@ -289,8 +305,8 @@ lemma bayesBinaryRisk_eq_lintegral_min (μ ν : Measure 𝒳) [IsFiniteMeasure �
     [IsFiniteMeasure ν] (π : Measure Bool) [IsFiniteMeasure π] :
     bayesBinaryRisk μ ν π = ∫⁻ x, min (π {false} * μ.rnDeriv (Kernel.boolKernel μ ν ∘ₘ π) x)
       (π {true} * ν.rnDeriv (Kernel.boolKernel μ ν ∘ₘ π) x) ∂(Kernel.boolKernel μ ν ∘ₘ π) := by
-  simp_rw [bayesBinaryRisk, bayesRisk_boolKernel_eq_lintegral_iInf measurable_simpleBinaryLoss μ ν π
-    (hasArgminEstimator_simpleBinaryLoss μ ν π), iInf_bool_eq]
+  simp_rw [bayesBinaryRisk, bayesRisk_boolKernel_eq_lintegral_iInf measurable_zeroOneLoss μ ν π
+    hasArgminEstimator_zeroOneLoss, iInf_bool_eq]
   simp
 
 /-- The Bayes binary risk as an integral with respect to `ν`. The singular part of `μ` with respect
@@ -340,6 +356,27 @@ lemma bayesBinaryRisk_eq_lintegral_min_rnDeriv (μ ν : Measure 𝒳) [IsFiniteM
     _ ≤ π {false} * μ E + π {true} * ν Eᶜ := by
       gcongr
       exact μ.withDensity_rnDeriv_le ν
+
+/-- The Bayes binary risk of two mutually singular measures vanishes: the test with rejection
+region a `μ`-null set carrying `ν` makes no error. -/
+lemma bayesBinaryRisk_of_mutuallySingular (h : μ ⟂ₘ ν) (π : Measure Bool) :
+    bayesBinaryRisk μ ν π = 0 := by
+  have h_le := bayesRisk_le_avgRisk zeroOneLoss (Kernel.boolKernel μ ν)
+    (Kernel.deterministic (fun x ↦ Bool.ofNat (h.nullSet.indicator 1 x))
+      (Measurable.of_discrete.fun_comp (measurable_one.indicator h.measurableSet_nullSet))) π
+  rw [avgRisk_binary_of_deterministic_indicator _ _ _ h.measurableSet_nullSet, h.measure_nullSet,
+    h.measure_compl_nullSet, mul_zero, mul_zero, add_zero, nonpos_iff_eq_zero] at h_le
+  exact h_le
+
+/-- For a prior with positive weights, the Bayes binary risk vanishes if and only if the two
+measures are mutually singular. -/
+lemma bayesBinaryRisk_eq_zero_iff_mutuallySingular [IsFiniteMeasure μ] [IsFiniteMeasure ν]
+    [IsFiniteMeasure π] (h_false : π {false} ≠ 0) (h_true : π {true} ≠ 0) :
+    bayesBinaryRisk μ ν π = 0 ↔ μ ⟂ₘ ν := by
+  rw [bayesBinaryRisk_eq_lintegral_min_rnDeriv, lintegral_eq_zero_iff (by fun_prop),
+    ← Measure.rnDeriv_eq_zero]
+  refine Filter.eventually_congr (.of_forall fun x ↦ ?_)
+  simp +contextual [min_eq_iff, h_false, h_true]
 
 lemma toReal_bayesBinaryRisk_eq_integral_min (μ ν : Measure 𝒳) [IsFiniteMeasure μ]
     [IsFiniteMeasure ν] (π : Measure Bool) [IsFiniteMeasure π] :

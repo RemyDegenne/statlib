@@ -18,7 +18,7 @@ the decrease of the Bayes risk of the simple binary hypothesis testing problem b
 obtained by observing the data. It is a divergence between `μ` and `ν` which satisfies the
 data-processing inequality. The total variation distance is a statistical information (see
 `Statlib.Divergence.TotalVariation`), and every f-divergence is an integral of statistical
-informations (Liese and Vajda).
+informations (Liese and Vajda, see `Statlib.Divergence.FDiv.IntegralRepresentation`).
 
 ## Main definitions
 
@@ -28,6 +28,9 @@ informations (Liese and Vajda).
 
 ## Main statements
 
+* `statInfo_eq_statInfo_one_one`: the statistical information for a prior `π` is the statistical
+  information for the prior `(1, 1)` of the measures weighted by `π`.
+* `statInfo_smul_prior`: the statistical information is positively homogeneous in the prior.
 * `statInfo_comp_le`: **data-processing inequality** for the statistical information.
 * `statInfo_eq_lintegral_add_of_le`, `statInfo_eq_lintegral_of_ge`: the statistical information as
   an integral with respect to `ν`, plus a contribution of the singular part of `μ`.
@@ -61,15 +64,30 @@ variable {𝒳 𝒳' : Type*} {m𝒳 : MeasurableSpace 𝒳} {m𝒳' : Measurabl
 observation is discarded. -/
 noncomputable
 def statInfo (μ ν : Measure 𝒳) (π : Measure Bool) : ℝ≥0∞ :=
-  riskIncrease simpleBinaryLoss (Kernel.boolKernel μ ν) π
+  riskIncrease zeroOneLoss (Kernel.boolKernel μ ν) π
 
 lemma statInfo_eq_riskIncrease (μ ν : Measure 𝒳) (π : Measure Bool) :
-    statInfo μ ν π = riskIncrease simpleBinaryLoss (Kernel.boolKernel μ ν) π := rfl
+    statInfo μ ν π = riskIncrease zeroOneLoss (Kernel.boolKernel μ ν) π := rfl
 
 lemma statInfo_eq_min_sub (μ ν : Measure 𝒳) (π : Measure Bool) :
     statInfo μ ν π = min (π {false} * μ univ) (π {true} * ν univ) - bayesBinaryRisk μ ν π := by
-  rw [statInfo, riskIncrease_eq_iInf_sub' measurable_simpleBinaryLoss, iInf_bool_eq]
+  rw [statInfo, riskIncrease_eq_iInf_sub' measurable_zeroOneLoss, iInf_bool_eq]
   simp [lintegral_bool, bayesBinaryRisk, mul_comm]
+
+/-- The statistical information for a prior `π` is the statistical information for the prior
+`(1, 1)` (the counting measure on `Bool`) of the measures weighted by `π`. -/
+lemma statInfo_eq_statInfo_one_one (μ ν : Measure 𝒳) (π : Measure Bool) :
+    statInfo μ ν π = statInfo (π {false} • μ) (π {true} • ν) (Measure.boolMeasure 1 1) := by
+  rw [statInfo_eq_min_sub, statInfo_eq_min_sub, bayesBinaryRisk_eq_bayesBinaryRisk_one_one]
+  simp
+
+/-- The statistical information is positively homogeneous in the prior: scaling the prior by a
+finite factor scales the statistical information by the same factor. -/
+lemma statInfo_smul_prior (μ ν : Measure 𝒳) (π : Measure Bool) {c : ℝ≥0∞} (hc : c ≠ ∞) :
+    statInfo μ ν (c • π) = c * statInfo μ ν π := by
+  rw [statInfo_eq_min_sub, statInfo_eq_min_sub, bayesBinaryRisk_smul_prior μ ν π hc,
+    Measure.smul_apply, Measure.smul_apply, smul_eq_mul, smul_eq_mul, mul_assoc, mul_assoc,
+    ← mul_min, ENNReal.mul_sub fun _ _ ↦ hc]
 
 @[simp] lemma statInfo_zero_left : statInfo 0 ν π = 0 := by simp [statInfo_eq_min_sub]
 
@@ -112,7 +130,7 @@ lemma statInfo_of_measure_false_eq_zero (μ ν : Measure 𝒳) (hπ : π {false}
 lemma statInfo_comp_le (μ ν : Measure 𝒳) (π : Measure Bool) (η : Kernel 𝒳 𝒳') [IsMarkovKernel η] :
     statInfo (η ∘ₘ μ) (η ∘ₘ ν) π ≤ statInfo μ ν π := by
   simpa [statInfo, Kernel.comp_boolKernel]
-    using riskIncrease_comp_le simpleBinaryLoss (Kernel.boolKernel μ ν) π η
+    using riskIncrease_comp_le zeroOneLoss (Kernel.boolKernel μ ν) π η
 
 /-- **Data processing inequality** for the statistical information, applied to the indicator of an
 event `E`. -/
@@ -152,6 +170,24 @@ lemma statInfo_eq_min_sub_lintegral' {ζ : Measure 𝒳} [IsFiniteMeasure μ] [I
   filter_upwards [Measure.rnDeriv_mul_rnDeriv hμac, Measure.rnDeriv_mul_rnDeriv hνac] with x hxμ hxν
   rw [mul_min, mul_comm, mul_comm _ (π _ * _), mul_assoc, mul_assoc]
   congr
+
+/-- The statistical information `I_{(a, b)}(μ, ν)` for the prior `(a, b)` is a measurable function
+of `(a, b)`. -/
+lemma measurable_statInfo_boolMeasure_ofReal (μ ν : Measure 𝒳) [IsFiniteMeasure μ]
+    [IsFiniteMeasure ν] :
+    Measurable fun p : ℝ × ℝ ↦
+      statInfo μ ν (Measure.boolMeasure (ENNReal.ofReal p.1) (ENNReal.ofReal p.2)) := by
+  have hμ : μ ≪ μ + ν := Measure.AbsolutelyContinuous.rfl.add_right ν
+  have hν : ν ≪ μ + ν := Measure.absolutelyContinuous_of_le (Measure.le_add_left le_rfl)
+  have h_eq (p : ℝ × ℝ) :
+      statInfo μ ν (Measure.boolMeasure (ENNReal.ofReal p.1) (ENNReal.ofReal p.2))
+        = min (ENNReal.ofReal p.1 * μ univ) (ENNReal.ofReal p.2 * ν univ)
+          - ∫⁻ x, min (ENNReal.ofReal p.1 * (∂μ/∂(μ + ν)) x)
+            (ENNReal.ofReal p.2 * (∂ν/∂(μ + ν)) x) ∂(μ + ν) := by
+    simpa using statInfo_eq_min_sub_lintegral'
+      (Measure.boolMeasure (ENNReal.ofReal p.1) (ENNReal.ofReal p.2)) hμ hν
+  simp_rw [h_eq]
+  exact Measurable.sub (by fun_prop) (Measurable.lintegral_prod_right (by fun_prop))
 
 lemma toReal_statInfo_eq_min_sub_integral (μ ν : Measure 𝒳) [IsFiniteMeasure μ] [IsFiniteMeasure ν]
     (π : Measure Bool) [IsFiniteMeasure π] :

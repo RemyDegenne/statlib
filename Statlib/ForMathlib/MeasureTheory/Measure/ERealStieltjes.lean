@@ -325,7 +325,7 @@ theorem length_subadditive_Icc_Ioo {a b : ℝ} {c d : ℕ → ℝ} (ss : Icc a b
       ⟨s, _, hf, hs⟩
     have e : ⋃ i ∈ (hf.toFinset : Set ℕ), Ioo (c i) (d i) = ⋃ i ∈ s, Ioo (c i) (d i) := by
       simp only [Finset.set_biUnion_coe, Finite.mem_toFinset]
-    rw [ENNReal.tsum_eq_iSup_sum]
+    rw [tsum_eq_iSup_sum]
     refine le_trans ?_ (le_iSup _ hf.toFinset)
     exact this hf.toFinset _ (by simpa only [e] )
   clear ss b
@@ -381,7 +381,7 @@ theorem outer_Ioc_of_ne_bot (a b : ℝ) (ha : f a ≠ ⊥) :
     rw [← iUnion_inter]
     simp [hs']
   have h : ∑' i, f.length (s i) < ⊤ := by
-    refine (ENNReal.tsum_le_tsum fun n ↦ ?_).trans_lt h'
+    refine (tsum_le_tsum fun n ↦ ?_).trans_lt h'
     exact f.length_mono inter_subset_left
   suffices (f b - f a).toENNReal ≤ ∑' i, f.length (s i) + ε by
     refine this.trans ?_
@@ -405,7 +405,7 @@ theorem outer_Ioc_of_ne_bot (a b : ℝ) (ha : f a ≠ ⊥) :
       ∧ (f p.2 - f p.1).toENNReal < f.length (s i) + ε' i := by
     intro i
     have hl :=
-      ENNReal.lt_add_right ((ENNReal.le_tsum i).trans_lt h).ne (ENNReal.coe_ne_zero.2 (ε'0 i).ne')
+      ENNReal.lt_add_right ((le_tsum _ i).trans_lt h).ne (ENNReal.coe_ne_zero.2 (ε'0 i).ne')
     conv at hl =>
       lhs
       rw [length]
@@ -456,9 +456,9 @@ theorem outer_Ioc_of_ne_bot (a b : ℝ) (ha : f a ≠ ⊥) :
       refine (add_le_add (f.length_subadditive_Icc_Ioo I_subset) ?_)
       exact EReal.toENNReal_le_toENNReal ha'.le
     _ ≤ ∑' i, (f.length (s i) + ε' i) + δ :=
-      (add_le_add (ENNReal.tsum_le_tsum fun i => (hg i).2.le)
+      (add_le_add (tsum_le_tsum fun i => (hg i).2.le)
         (by simp only [ENNReal.ofReal_coe_nnreal, le_rfl]))
-    _ = ∑' i, f.length (s i) + ∑' i, (ε' i : ℝ≥0∞) + δ := by rw [ENNReal.tsum_add]
+    _ = ∑' i, f.length (s i) + ∑' i, (ε' i : ℝ≥0∞) + δ := by rw [tsum_add]
     _ ≤ ∑' i, f.length (s i) + δ + δ := add_le_add (add_le_add le_rfl hε.le) le_rfl
     _ = ∑' i : ℕ, f.length (s i) + ε := by simp [δ, add_assoc, ENNReal.add_halves]
 
@@ -507,7 +507,7 @@ lemma outer_singleton_eq_top' {b : ℝ} (hb : ∀ a < b, f b - f a = ∞) :
   rw [outer_def, OuterMeasure.ofFunction_apply]
   simp only [iInf_eq_top]
   intro s hs
-  refine ENNReal.tsum_eq_top_of_eq_top ?_
+  refine tsum_eq_top_of_eq_top ?_
   simp_rw [length]
   simp only [iInf_eq_top, EReal.toENNReal_eq_top_iff]
   obtain ⟨n, hn⟩ : ∃ n, b ∈ s n := by
@@ -596,13 +596,13 @@ theorem outer_trim : f.outer.trim = f.outer := by
   refine le_iInf fun t => le_iInf fun ht => ENNReal.le_of_forall_pos_le_add fun ε ε0 h => ?_
   rcases ENNReal.exists_pos_sum_of_countable (ENNReal.coe_pos.2 ε0).ne' ℕ with ⟨ε', ε'0, hε⟩
   refine le_trans ?_ (add_le_add_right (le_of_lt hε) _)
-  rw [← ENNReal.tsum_add]
+  rw [← tsum_add]
   choose g hg using
     show ∀ i, ∃ s, t i ⊆ s ∧ MeasurableSet s
         ∧ f.outer s ≤ f.length (t i) + ENNReal.ofReal (ε' i) by
       intro i
       have hl :=
-        ENNReal.lt_add_right ((ENNReal.le_tsum i).trans_lt h).ne (ENNReal.coe_pos.2 (ε'0 i)).ne'
+        ENNReal.lt_add_right ((le_tsum _ i).trans_lt h).ne (ENNReal.coe_pos.2 (ε'0 i)).ne'
       conv at hl =>
         lhs
         rw [length]
@@ -614,7 +614,7 @@ theorem outer_trim : f.outer.trim = f.outer := by
   apply iInf_le_of_le (iUnion g) _
   apply iInf_le_of_le (ht.trans <| iUnion_mono fun i => (hg i).1) _
   apply iInf_le_of_le (MeasurableSet.iUnion fun i => (hg i).2.1) _
-  exact le_trans (measure_iUnion_le _) (ENNReal.tsum_le_tsum fun i => (hg i).2.2)
+  exact le_trans (measure_iUnion_le _) (tsum_le_tsum fun i => (hg i).2.2)
 
 theorem borel_le_measurable : borel ℝ ≤ f.outer.caratheodory := by
   rw [borel_eq_generateFrom_Ioi]

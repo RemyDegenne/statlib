@@ -5,12 +5,9 @@ Authors: Rémy Degenne, Lorenzo Luccioli
 -/
 module
 
+public import Statlib.Divergence.FDiv.Conj
+public import Statlib.Divergence.FDiv.Convex
 public import Statlib.Divergence.Hellinger.HellingerDivFun
-public import Statlib.Divergence.KullbackLeibler.Basic
-public import Statlib.Divergence.FDiv.Basic
-public import Mathlib.Analysis.Convex.SpecificFunctions.Pow
-public import Mathlib.Analysis.SpecialFunctions.Pow.Deriv
-public import Statlib.Divergence.FDiv.CompProd
 
 /-!
 # Hellinger divergence
@@ -19,6 +16,7 @@ public import Statlib.Divergence.FDiv.CompProd
 
 * `hellingerDiv a μ ν`: the Hellinger divergence of order `a`, the f-divergence for the divergence
   function `hellingerDivFun a`.
+* `sqHellinger`: the squared Hellinger distance, half of the Hellinger divergence of order `2⁻¹`.
 
 ## Main statements
 
@@ -26,9 +24,14 @@ public import Statlib.Divergence.FDiv.CompProd
 * `hellingerDiv_of_nonpos`: `hellingerDiv a μ ν = 0` for `a ≤ 0`.
 * `hellingerDiv_ne_top_of_lt_one`, `hellingerDiv_eq_top_iff`: finiteness of the divergence.
 * `hellingerDiv_comp_le_compProd`, `hellingerDiv_comp_right_le`: data-processing inequalities.
+* `hellingerDiv_smul_add_smul_le`: joint convexity of the Hellinger divergence.
 * `toReal_hellingerDiv_smul_left`, `toReal_hellingerDiv_smul_right`: behaviour under scaling of
   the measures.
-* `sqHellinger`: the squared Hellinger distance, half of the Hellinger divergence of order `2⁻¹`.
+* `sqHellinger_comm`: the squared Hellinger distance is symmetric.
+* `toReal_sqHellinger_eq_integral`: for finite measures,
+  `H²(μ, ν) = (μ(X) + ν(X)) / 2 - ∫ √(∂μ/∂ν) ∂ν`.
+* `sqHellinger_le_one`, `sqHellinger_eq_one_iff`: for probability measures, `H²(μ, ν) ≤ 1`, with
+  equality iff `μ ⟂ₘ ν`.
 
 This file is adapted from the testing-lower-bounds project of Rémy Degenne and Lorenzo Luccioli
 (https://github.com/RemyDegenne/testing-lower-bounds).
@@ -58,6 +61,9 @@ noncomputable def hellingerDiv (a : ℝ) (μ ν : Measure α) : ℝ≥0∞ := fD
   rw [hellingerDiv, hellingerDivFun_of_nonpos ha, fDiv_zero]
 
 lemma hellingerDiv_zero : hellingerDiv 0 μ ν = 0 := by simp
+
+@[simp] lemma hellingerDiv_self (μ : Measure α) [SigmaFinite μ] : hellingerDiv a μ μ = 0 :=
+  fDiv_self μ
 
 @[simp] lemma hellingerDiv_one (μ ν : Measure α) [IsFiniteMeasure μ] [IsFiniteMeasure ν] :
     hellingerDiv 1 μ ν = klDiv μ ν := by
@@ -325,16 +331,43 @@ lemma hellingerDiv_comp_right_le (μ ν : Measure α) [IsFiniteMeasure μ] [IsFi
 
 end DataProcessingInequality
 
+section Convexity
+
+/-- The Hellinger divergence of the sum of two pairs of measures is at most the sum of the
+divergences. -/
+theorem hellingerDiv_add_add_le (a : ℝ) (μ₀ μ₁ ν₀ ν₁ : Measure α) [IsFiniteMeasure μ₀]
+    [IsFiniteMeasure μ₁] [IsFiniteMeasure ν₀] [IsFiniteMeasure ν₁] :
+    hellingerDiv a (μ₀ + μ₁) (ν₀ + ν₁) ≤ hellingerDiv a μ₀ ν₀ + hellingerDiv a μ₁ ν₁ :=
+  fDiv_add_add_le _ _ _ _
+
+/-- **Joint convexity** of the Hellinger divergence. -/
+theorem hellingerDiv_smul_add_smul_le (a : ℝ) (μ₀ μ₁ ν₀ ν₁ : Measure α) [IsFiniteMeasure μ₀]
+    [IsFiniteMeasure μ₁] [IsFiniteMeasure ν₀] [IsFiniteMeasure ν₁] (c d : ℝ≥0) :
+    hellingerDiv a (c • μ₀ + d • μ₁) (c • ν₀ + d • ν₁)
+      ≤ c * hellingerDiv a μ₀ ν₀ + d * hellingerDiv a μ₁ ν₁ :=
+  fDiv_smul_add_smul_le _ _ _ _ c d
+
+end Convexity
+
 section MeasUnivAddMulHellingerDiv
 
 /-! In this section there are results about the expression `ν(α) + (a - 1) * Hₐ(μ, ν)`,
 which appears in the definition of the Renyi divergence. -/
 
-lemma hellingerDiv_le_of_lt_one (ha : a < 1) (μ ν : Measure α)
-    [IsFiniteMeasure μ] [IsFiniteMeasure ν] :
+lemma hellingerDiv_le_of_lt_one (ha : a < 1) (μ ν : Measure α) :
     hellingerDiv a μ ν ≤ ν Set.univ + ENNReal.ofReal (a * (1 - a)⁻¹) * μ Set.univ := by
   by_cases h_zero : a ≤ 0
   · simp [h_zero]
+  -- if one of the measures is infinite, the right-hand side is `∞`
+  have h_ne : ENNReal.ofReal (a * (1 - a)⁻¹) ≠ 0 := by
+    simp only [ne_eq, ENNReal.ofReal_eq_zero, not_le]
+    exact mul_pos (not_le.mp h_zero) (inv_pos.mpr (sub_pos.mpr ha))
+  rcases eq_top_or_lt_top (μ .univ) with hμ | hμ
+  · simp [hμ, ENNReal.mul_top h_ne]
+  rcases eq_top_or_lt_top (ν .univ) with hν | hν
+  · simp [hν]
+  have : IsFiniteMeasure μ := ⟨hμ⟩
+  have : IsFiniteMeasure ν := ⟨hν⟩
   refine fDiv_le_zero_add_top.trans_eq ?_
   simp [h_zero, ha]
 
@@ -483,29 +516,6 @@ lemma hellingerDiv_smul_right_eq_top_iff' [IsFiniteMeasure μ] [IsFiniteMeasure 
   rw [← ENNReal.smul_def]
   exact hellingerDiv_smul_right_eq_top_iff ha_ne c (by simpa using hc)
 
-lemma integral_rpow_rnDeriv_le_rpow_mul_rpow_of_lt_one (ha_pos : 0 < a) (ha_lt : a < 1)
-    [IsFiniteMeasure μ] [IsFiniteMeasure ν] :
-    ∫ x, ((∂μ/∂ν) x).toReal ^ a ∂ν ≤ (μ .univ).toReal ^ a * (ν .univ).toReal ^ (1 - a) := by
-  rcases eq_or_ne μ 0 with rfl | hμ
-  · have : ∫ x, ((∂(0 : Measure α)/∂ν) x).toReal ^ a ∂ν = 0 := by
-      refine integral_eq_zero_of_ae ?_
-      filter_upwards [ν.rnDeriv_zero] with x hx
-      simp [hx, ha_pos.ne']
-    rw [this]
-    positivity
-  rcases eq_or_ne ν 0 with rfl | hν
-  · simp only [integral_zero_measure]
-    positivity
-  have : NeZero μ := ⟨hμ⟩
-  have : NeZero ν := ⟨hν⟩
-  rw [integral_rpow_rnDeriv_eq_mul_integral_rpow_rnDeriv_inv_smul ha_lt.ne]
-  refine mul_le_of_le_one_right (by positivity) ?_
-  rw [← mul_hellingerDiv_add_meas_eq_integral_of_lt_one ha_pos ha_lt]
-  simp only [measure_univ, ENNReal.toReal_one, mul_one]
-  have : (a - 1) * (hellingerDiv a ((μ .univ)⁻¹ • μ) ((ν .univ)⁻¹ • ν)).toReal ≤ 0 :=
-    mul_nonpos_of_nonpos_of_nonneg (by linarith) ENNReal.toReal_nonneg
-  linarith
-
 lemma rpow_mul_rpow_le_integral_rpow_rnDeriv_of_one_lt (ha : 1 < a)
     [NeZero μ] [IsFiniteMeasure μ] [IsFiniteMeasure ν] (h : hellingerDiv a μ ν ≠ ∞) :
     (μ .univ).toReal ^ a * (ν .univ).toReal ^ (1 - a) ≤ ∫ x, ((∂μ/∂ν) x).toReal ^ a ∂ν := by
@@ -524,22 +534,6 @@ lemma rpow_mul_rpow_le_integral_rpow_rnDeriv_of_one_lt (ha : 1 < a)
   have : 0 ≤ (a - 1) * (hellingerDiv a ((μ .univ)⁻¹ • μ) ((ν .univ)⁻¹ • ν)).toReal :=
     mul_nonneg (by linarith) ENNReal.toReal_nonneg
   linarith
-
-lemma log_integral_rpow_rnDeriv_le_of_lt_one (ha_pos : 0 < a) (ha_lt : a < 1)
-    [IsFiniteMeasure μ] [IsFiniteMeasure ν] (h_ms : ¬ μ ⟂ₘ ν) :
-    Real.log (∫ x, ((∂μ/∂ν) x).toReal ^ a ∂ν)
-      ≤ a * Real.log (μ .univ).toReal + (1 - a) * Real.log (ν .univ).toReal := by
-  have hμ : μ ≠ 0 := fun h ↦ h_ms (by rw [h]; exact .zero_left)
-  have hν : ν ≠ 0 := fun h ↦ h_ms (by rw [h]; exact .zero_right)
-  have hm : 0 < (μ .univ).toReal :=
-    ENNReal.toReal_pos (Measure.measure_univ_ne_zero.mpr hμ) (measure_ne_top _ _)
-  have hn : 0 < (ν .univ).toReal :=
-    ENNReal.toReal_pos (Measure.measure_univ_ne_zero.mpr hν) (measure_ne_top _ _)
-  rw [← Real.log_rpow hm, ← Real.log_rpow hn,
-    ← Real.log_mul (rpow_pos_of_pos hm _).ne' (rpow_pos_of_pos hn _).ne']
-  refine Real.log_le_log ?_ (integral_rpow_rnDeriv_le_rpow_mul_rpow_of_lt_one ha_pos ha_lt)
-  exact (integral_rpow_rnDeriv_pos_iff_not_mutuallySingular ha_pos.ne'
-    (integrable_rpow_rnDeriv_of_lt_one ha_pos.le ha_lt)).mpr h_ms
 
 lemma le_log_integral_rpow_rnDeriv_of_one_lt (ha : 1 < a)
     [NeZero μ] [IsFiniteMeasure μ] [IsFiniteMeasure ν] (h : hellingerDiv a μ ν ≠ ∞) :
@@ -563,6 +557,9 @@ section SqHellinger
 order `2⁻¹`. -/
 noncomputable def sqHellinger (μ ν : Measure α) : ℝ≥0∞ := 2⁻¹ * hellingerDiv 2⁻¹ μ ν
 
+lemma two_mul_sqHellinger (μ ν : Measure α) : 2 * sqHellinger μ ν = hellingerDiv 2⁻¹ μ ν := by
+  rw [sqHellinger, ← mul_assoc, ENNReal.mul_inv_cancel two_ne_zero ENNReal.ofNat_ne_top, one_mul]
+
 lemma hellingerFun_inv_two {x : ℝ} (hx : 0 ≤ x) : hellingerFun 2⁻¹ x = (1 - √x) ^ 2 := by
   rw [hellingerFun_of_ne_zero_of_ne_one (by norm_num) (by norm_num), Real.sqrt_eq_rpow, one_div]
   beta_reduce
@@ -578,6 +575,74 @@ lemma sqHellinger_eq_ofReal_integral_of_ac [IsFiniteMeasure μ] [IsFiniteMeasure
   · simp_rw [hellingerFun_inv_two ENNReal.toReal_nonneg]
   · rw [integrable_hellingerFun_iff_integrable_rpow (by norm_num)]
     exact integrable_rpow_rnDeriv_of_lt_one (by norm_num) (by norm_num)
+
+@[simp] lemma sqHellinger_self (μ : Measure α) [SigmaFinite μ] : sqHellinger μ μ = 0 := by
+  simp [sqHellinger]
+
+/-- The squared Hellinger distance is symmetric. -/
+lemma sqHellinger_comm (μ ν : Measure α) [SigmaFinite μ] [SigmaFinite ν] :
+    sqHellinger μ ν = sqHellinger ν μ := by
+  rw [sqHellinger, sqHellinger, hellingerDiv, hellingerDiv, ← fDiv_conj,
+    conj_hellingerDivFun_inv_two]
+
+lemma sqHellinger_ne_top (μ ν : Measure α) [IsFiniteMeasure μ] [IsFiniteMeasure ν] :
+    sqHellinger μ ν ≠ ∞ :=
+  ENNReal.mul_ne_top (by simp) (hellingerDiv_ne_top_of_lt_one (by norm_num) μ ν)
+
+/-- The squared Hellinger distance between finite measures, in terms of the integral of the square
+root of the Radon-Nikodym derivative. -/
+lemma toReal_sqHellinger_eq_integral [IsFiniteMeasure μ] [IsFiniteMeasure ν] :
+    (sqHellinger μ ν).toReal
+      = 2⁻¹ * (μ.real .univ + ν.real .univ) - ∫ x, √((∂μ/∂ν) x).toReal ∂ν := by
+  rw [sqHellinger, ENNReal.toReal_mul,
+    toReal_hellingerDiv_eq_integral_of_lt_one (by norm_num) (by norm_num)]
+  simp_rw [Real.sqrt_eq_rpow, one_div, measureReal_def]
+  norm_num
+  ring
+
+/-- For probability measures, `1 - H²(μ, ν)` is the Bhattacharyya coefficient
+`∫ √(∂μ/∂ν) ∂ν`. -/
+lemma one_sub_toReal_sqHellinger [IsProbabilityMeasure μ] [IsProbabilityMeasure ν] :
+    1 - (sqHellinger μ ν).toReal = ∫ x, √((∂μ/∂ν) x).toReal ∂ν := by
+  rw [toReal_sqHellinger_eq_integral]
+  simp only [probReal_univ]
+  ring
+
+/-- `2 * H²(μ, ν) ≤ μ(X) + ν(X)`. For finite measures, equality holds iff `μ ⟂ₘ ν`
+(`hellingerDiv_eq_add_measure_univ_iff_of_lt_one`). -/
+lemma two_mul_sqHellinger_le_add (μ ν : Measure α) :
+    2 * sqHellinger μ ν ≤ μ .univ + ν .univ := by
+  rw [two_mul_sqHellinger, add_comm]
+  convert hellingerDiv_le_of_lt_one (a := 2⁻¹) (by norm_num) μ ν
+  norm_num
+
+lemma sqHellinger_le_one [IsProbabilityMeasure μ] [IsProbabilityMeasure ν] :
+    sqHellinger μ ν ≤ 1 := by
+  have h := two_mul_sqHellinger_le_add μ ν
+  rw [measure_univ, measure_univ, one_add_one_eq_two] at h
+  rwa [← ENNReal.mul_le_mul_iff_right two_ne_zero ENNReal.ofNat_ne_top, mul_one]
+
+lemma toReal_sqHellinger_le_one [IsProbabilityMeasure μ] [IsProbabilityMeasure ν] :
+    (sqHellinger μ ν).toReal ≤ 1 :=
+  ENNReal.toReal_le_of_le_ofReal zero_le_one (by simpa using sqHellinger_le_one)
+
+lemma toReal_sqHellinger_eq_one_iff [IsProbabilityMeasure μ] [IsProbabilityMeasure ν] :
+    (sqHellinger μ ν).toReal = 1 ↔ μ ⟂ₘ ν := by
+  have h := one_sub_toReal_sqHellinger (μ := μ) (ν := ν)
+  simp_rw [Real.sqrt_eq_rpow, one_div] at h
+  rw [← integral_rpow_rnDeriv_eq_zero_iff_mutuallySingular (a := 2⁻¹) (by norm_num)
+    (integrable_rpow_rnDeriv_of_lt_one (by norm_num) (by norm_num)), ← h, sub_eq_zero, eq_comm]
+
+/-- For probability measures, `H²(μ, ν) = 1` iff the measures are mutually singular. -/
+lemma sqHellinger_eq_one_iff [IsProbabilityMeasure μ] [IsProbabilityMeasure ν] :
+    sqHellinger μ ν = 1 ↔ μ ⟂ₘ ν := by
+  rw [← toReal_sqHellinger_eq_one_iff, ← ENNReal.toReal_eq_toReal_iff' (sqHellinger_ne_top μ ν)
+    ENNReal.one_ne_top, ENNReal.toReal_one]
+
+lemma toReal_sqHellinger_lt_one [IsProbabilityMeasure μ] [IsProbabilityMeasure ν]
+    (h_ms : ¬ μ ⟂ₘ ν) :
+    (sqHellinger μ ν).toReal < 1 :=
+  toReal_sqHellinger_le_one.lt_of_ne fun h ↦ h_ms (toReal_sqHellinger_eq_one_iff.mp h)
 
 end SqHellinger
 
