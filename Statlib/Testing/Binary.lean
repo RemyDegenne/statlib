@@ -325,7 +325,7 @@ lemma bayesBinaryRisk_eq_lintegral_min_rnDeriv (μ ν : Measure 𝒳) [IsFiniteM
       ⟨h.nullSet, h.measurableSet_nullSet, h.measure_nullSet, h.measure_compl_nullSet⟩
     have h_false : μ (F ∩ t) ≤ ∫⁻ x in F, (∂μ/∂ν) x ∂ν := by
       conv_lhs => rw [μ.haveLebesgueDecomposition_add ν]
-      rw [Measure.add_apply, withDensity_apply _ (hF.inter ht),
+      rw [add_apply, withDensity_apply _ (hF.inter ht),
         measure_mono_null Set.inter_subset_right hμt, zero_add]
       exact lintegral_mono_set Set.inter_subset_left
     have h_true : ν (F ∩ t)ᶜ ≤ ν Fᶜ := by
@@ -444,7 +444,7 @@ lemma toReal_bayesBinaryRisk_eq_integral_abs (μ ν : Measure 𝒳) [IsFiniteMea
         (absolutelyContinuous_boolKernel_comp_right μ ν hπ_true)]
       rw [measureReal_def]
     _ = _ := by
-      simp_rw [add_comm, Measure.coe_add, Measure.coe_smul, Pi.add_apply, Pi.smul_apply,
+      simp_rw [add_comm, FunLike.coe_add, FunLike.coe_smul, Pi.add_apply, Pi.smul_apply,
         smul_eq_mul, ENNReal.toReal_add (ENNReal.mul_ne_top (measure_ne_top _ _)
         (measure_ne_top _ _)) (ENNReal.mul_ne_top (measure_ne_top _ _) (measure_ne_top _ _)),
         ENNReal.toReal_mul]

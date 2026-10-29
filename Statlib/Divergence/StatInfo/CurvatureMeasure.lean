@@ -87,7 +87,7 @@ lemma measure_rightDerivStieltjes_statInfoDivFun (hβ : 0 < β) (hγ : 0 < γ) :
   -- the part of the measure on `Iic 0` is an infinite atom at `0`
   have h_Iic : g.measure.restrict (Iic 0) = ∞ • Measure.dirac 0 := by
     ext s hs
-    rw [Measure.restrict_apply hs, Measure.smul_apply, Measure.dirac_apply' _ hs, smul_eq_mul]
+    rw [Measure.restrict_apply hs, smul_apply, Measure.dirac_apply' _ hs, smul_eq_mul]
     by_cases h0 : (0 : ℝ) ∈ s
     · rw [indicator_of_mem h0, Pi.one_apply, mul_one]
       refine top_le_iff.mp ?_
@@ -112,7 +112,7 @@ lemma measure_rightDerivStieltjes_statInfoDivFun (hβ : 0 < β) (hγ : 0 < γ) :
     exact ENNReal.ofReal_lt_top⟩
   have h_Ioi : g.measure.restrict (Ioi 0) = ENNReal.ofReal β • Measure.dirac (γ / β) := by
     refine Measure.ext_of_Iic _ _ fun x ↦ ?_
-    rw [Measure.restrict_apply measurableSet_Iic, Iic_inter_Ioi, Measure.smul_apply,
+    rw [Measure.restrict_apply measurableSet_Iic, Iic_inter_Ioi, smul_apply,
       Measure.dirac_apply' _ measurableSet_Iic, smul_eq_mul]
     rcases le_or_gt x 0 with hx | hx
     · rw [Ioc_eq_empty (not_lt.mpr hx), measure_empty,

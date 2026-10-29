@@ -338,7 +338,7 @@ instance _root_.MeasureTheory.Measure.neZero_compProd [SFinite μ] [NeZero μ] [
     NeZero (μ ⊗ₘ κ) :=
   ⟨fun h ↦ NeZero.ne μ (by
     rw [← Measure.measure_univ_eq_zero, ← Measure.compProd_apply_univ (κ := κ), h,
-      Measure.coe_zero, Pi.zero_apply])⟩
+      FunLike.coe_zero, Pi.zero_apply])⟩
 
 end CompProd
 

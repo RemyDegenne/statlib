@@ -77,7 +77,7 @@ lemma fDiv_prod_right (ξ : Measure β) [IsFiniteMeasure ξ] (μ ν : Measure α
     rw [← ENNReal.coe_ne_zero, hc]
     exact NeZero.ne _
   have : IsProbabilityMeasure (c⁻¹ • ξ) := ⟨by
-    rw [Measure.smul_apply, ← hc, ENNReal.smul_def, smul_eq_mul, ENNReal.coe_inv hc0,
+    rw [smul_apply, ← hc, ENNReal.smul_def, smul_eq_mul, ENNReal.coe_inv hc0,
       ENNReal.inv_mul_cancel (by simpa using hc0) ENNReal.coe_ne_top]⟩
   have h_prod (ρ : Measure α) [SFinite ρ] : ξ.prod ρ = c • (c⁻¹ • ξ).prod ρ := by
     rw [Measure.prod_smul_left, smul_smul, mul_inv_cancel₀ hc0, one_smul]

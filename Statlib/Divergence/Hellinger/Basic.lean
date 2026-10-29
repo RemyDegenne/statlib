@@ -140,7 +140,7 @@ lemma toReal_hellingerDiv_eq_integral_of_lt_one [IsFiniteMeasure μ] [IsFiniteMe
   congr 2
   rw [mul_comm a, ← mul_add]
   congr 1
-  conv_rhs => rw [μ.haveLebesgueDecomposition_add ν, add_comm, Measure.coe_add, Pi.add_apply,
+  conv_rhs => rw [μ.haveLebesgueDecomposition_add ν, add_comm, FunLike.coe_add, Pi.add_apply,
     ENNReal.toReal_add (measure_ne_top _ _) (measure_ne_top _ _)]
   simp only [MeasurableSet.univ, withDensity_apply, Measure.restrict_univ, add_left_inj]
   rw [integral_toReal]
@@ -472,7 +472,7 @@ lemma toReal_hellingerDiv_smul_left [IsFiniteMeasure μ] [IsFiniteMeasure ν]
   rw [toReal_hellingerDiv_eq_integral_of_ne_top ha_pos ha_ne
       (hellingerDiv_smul_left_ne_top ha_pos ha_ne h c),
     toReal_hellingerDiv_eq_integral_of_ne_top ha_pos ha_ne h, integral_rpow_rnDeriv_smul_left,
-    Measure.smul_apply, ENNReal.toReal_smul, NNReal.smul_def, smul_eq_mul]
+    smul_apply, ENNReal.toReal_smul, NNReal.smul_def, smul_eq_mul]
   have : (1 - a)⁻¹ = -(a - 1)⁻¹ := by rw [← neg_sub a 1, inv_neg]
   rw [this]
   ring

@@ -186,7 +186,7 @@ lemma renyiDiv_one_eq_top_iff [NeZero μ] [IsFiniteMeasure μ] [IsFiniteMeasure 
     renyiDiv 1 μ ν = ∞ ↔ klDiv μ ν = ∞ := by
   rw [renyiDiv_one]
   rcases eq_or_ne ν 0 with rfl | hν
-  · simp only [Measure.coe_zero, Pi.zero_apply, ENNReal.inv_zero, smul_zero, klDiv_zero_right]
+  · simp only [FunLike.coe_zero, Pi.zero_apply, ENNReal.inv_zero, smul_zero, klDiv_zero_right]
   have : NeZero ν := ⟨hν⟩
   rw [klDiv_smul_right_eq_top_iff (ENNReal.inv_ne_zero.mpr (measure_ne_top _ _))
       (ENNReal.inv_ne_top.mpr (NeZero.ne _)),
@@ -358,7 +358,7 @@ lemma renyiDiv_zero_measure_left (ha_nonneg : 0 ≤ a) (ha : a ≠ 1) (ν : Meas
     rw [h_set, ENNReal.zero_div, ENNReal.log_zero, EReal.neg_bot, EReal.toENNReal_top]
   rw [renyiDiv_of_ne_one ha_zero ha]
   simp only [EReal.coe_add, EReal.coe_mul, EReal.coe_sub, EReal.coe_one, ne_eq, measure_ne_top,
-    not_false_eq_true, EReal.coe_ennreal_toReal, Measure.coe_zero, Pi.zero_apply,
+    not_false_eq_true, EReal.coe_ennreal_toReal, FunLike.coe_zero, Pi.zero_apply,
     ENNReal.toReal_zero, mul_zero, EReal.coe_zero, add_zero, log_zero, zero_add,
     hellingerDiv_zero_measure_left (ha_nonneg.lt_of_ne' ha_zero)]
   have : (1 - (a : EReal)) * (ν Set.univ) + (a - 1) * (ν Set.univ) = 0 := by
@@ -386,7 +386,7 @@ lemma renyiDiv_zero_measure_right (ha_nonneg : 0 ≤ a)
   have ha_pos : 0 < a := ha_nonneg.lt_of_ne' ha_zero
   rcases lt_trichotomy a 1 with (ha | rfl | ha)
   · rw [renyiDiv_of_ne_one ha_zero ha.ne, hellingerDiv_zero_measure_right_of_lt_one ha_pos ha]
-    simp only [EReal.coe_add, Measure.coe_zero, Pi.zero_apply, ENNReal.toReal_zero, mul_zero,
+    simp only [EReal.coe_add, FunLike.coe_zero, Pi.zero_apply, ENNReal.toReal_zero, mul_zero,
       EReal.coe_zero, EReal.coe_mul, zero_add, EReal.coe_ennreal_mul, EReal.coe_ennreal_ofReal,
       EReal.toENNReal_eq_top_iff, log_zero, add_zero]
     have : (a : EReal) * (μ Set.univ).toReal + (a - 1) * ((max (a * (1 - a)⁻¹) 0) * (μ Set.univ))
@@ -407,10 +407,10 @@ lemma renyiDiv_zero_measure_right (ha_nonneg : 0 ≤ a)
     norm_cast
     exact EReal.coe_ne_top _
   · rw [renyiDiv_one]
-    simp only [Measure.coe_zero, Pi.zero_apply, ENNReal.inv_zero, smul_zero]
+    simp only [FunLike.coe_zero, Pi.zero_apply, ENNReal.inv_zero, smul_zero]
     exact klDiv_zero_right
   · rw [renyiDiv_of_ne_one ha_zero ha.ne', hellingerDiv_zero_measure_right_of_one_le ha.le]
-    simp only [EReal.coe_add, Measure.coe_zero, Pi.zero_apply, ENNReal.toReal_zero, mul_zero,
+    simp only [EReal.coe_add, FunLike.coe_zero, Pi.zero_apply, ENNReal.toReal_zero, mul_zero,
       EReal.coe_zero, EReal.coe_mul, zero_add, EReal.coe_ennreal_top, EReal.toENNReal_eq_top_iff,
       log_zero, add_zero]
     have : ((a : EReal) - 1) * ⊤ = ⊤ := by
@@ -837,7 +837,7 @@ lemma renyiDiv_eq_renyiDiv_inv_smul (ha_nonneg : 0 ≤ a) [IsFiniteMeasure μ] [
   rcases eq_zero_or_neZero μ with rfl | _
   · have := ν.smul_finite (ENNReal.inv_ne_top.mpr (NeZero.ne (ν .univ)))
     rcases eq_or_ne a 1 with rfl | ha1
-    · simp [renyiDiv_one]
+    · simp [renyiDiv_one, ENNReal.inv_mul_cancel (NeZero.ne (ν .univ)) (measure_ne_top _ _)]
     · simp only [smul_zero, renyiDiv_zero_measure_left ha_nonneg ha1]
   exact (renyiDiv_smul_smul ha_nonneg (ENNReal.inv_ne_zero.mpr (measure_ne_top _ _))
     (ENNReal.inv_ne_top.mpr (NeZero.ne _)) (ENNReal.inv_ne_zero.mpr (measure_ne_top _ _))

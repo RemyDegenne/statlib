@@ -91,7 +91,7 @@ lemma map_uncurry_compProd_of_mem_zero_one (hℓ : Measurable (uncurry ℓ))
   set A := {p : Θ × 𝓨 | ℓ p.1 p.2 = 1}
   have hA : MeasurableSet A := hℓ (measurableSet_singleton 1)
   ext s hs
-  rw [Measure.map_apply hℓ hs, Measure.add_apply, Measure.smul_apply, Measure.smul_apply,
+  rw [Measure.map_apply hℓ hs, add_apply, smul_apply, smul_apply,
     Measure.dirac_apply' _ hs, Measure.dirac_apply' _ hs, smul_eq_mul, smul_eq_mul]
   have h_pre : uncurry ℓ ⁻¹' s
       = (if (0 : ℝ≥0∞) ∈ s then Aᶜ else ∅) ∪ (if (1 : ℝ≥0∞) ∈ s then A else ∅) := by

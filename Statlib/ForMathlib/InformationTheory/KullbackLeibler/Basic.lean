@@ -174,7 +174,7 @@ lemma klDiv_inv_smul_le_of_le {β : Type*} {mβ : MeasurableSpace β} {μ₁ ν�
   · have hν₁ : ν₁ .univ = 0 := h_eq_ν.trans hν
     obtain rfl := Measure.measure_univ_eq_zero.mp hν
     obtain rfl := Measure.measure_univ_eq_zero.mp hν₁
-    simp only [Measure.coe_zero, Pi.zero_apply, ENNReal.inv_zero, smul_zero]
+    simp only [FunLike.coe_zero, Pi.zero_apply, ENNReal.inv_zero, smul_zero]
     by_cases hμ : μ₂ = 0
     · subst hμ
       obtain rfl : μ₁ = 0 := Measure.measure_univ_eq_zero.mp (h_eq_μ.trans (by simp))
